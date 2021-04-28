@@ -120,8 +120,10 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
 def expSeveralRuns(args, n_e, n_s, n_repeat):
     size = str(args['width']) + 'x' + str(args['height'])
     env_info = '_m' + str(args['n_modules'])
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2,allow_growth=True)
+    sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+    # config = tf.ConfigProto()
+    # config.gpu_options.allow_growth = True
     env = make_vec_env(MEDAEnv, wrapper_class=None,
                        n_envs = n_e, env_kwargs = args)
     showIsGPU()
