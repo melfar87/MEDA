@@ -12,7 +12,7 @@ from my_net import MyCnnPolicy
 from envs.dmfb import *
 from envs.meda import *
 
-from stable_baselines.common import make_vec_env
+from stable_baselines.common import make_vec_env, tf_util
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
 from stable_baselines.common.evaluation import evaluate_policy
@@ -120,6 +120,8 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
 def expSeveralRuns(args, n_e, n_s, n_repeat):
     size = str(args['width']) + 'x' + str(args['height'])
     env_info = '_m' + str(args['n_modules'])
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
     env = make_vec_env(MEDAEnv, wrapper_class=None,
                        n_envs = n_e, env_kwargs = args)
     showIsGPU()
