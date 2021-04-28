@@ -1,5 +1,4 @@
 /.vscode
 /meda.code-workspace
 /MEDA_env
-/__pycache__
-envs/__pycache__
+__pycache__/
