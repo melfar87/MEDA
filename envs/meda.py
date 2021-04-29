@@ -253,7 +253,7 @@ class MEDAEnv(gym.Env):
         """
         # [TODO] Implement random dr_0 and dr_g generator based on size
         self.droplet = np.array((3,2,6,5))
-        self.goal = np.array((20,22,23,25))
+        self.goal = np.array((self.width-4-3,self.height-3-3,self.width-4,self.height-3))
         self.agt_sta = copy.deepcopy(self.droplet)
         return
     

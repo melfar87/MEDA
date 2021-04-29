@@ -96,58 +96,60 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
         plt.savefig('log/' + size + env_info + '.png')
 
 
-def runAnExperiment(
-        env,
-        model = None,
-        num_iterations = 50,
-        num_steps = 20000,
-        policy_steps = 128,
-        b_path = False):
+def runAnExperiment(env, model=None, n_episodes=50, num_steps=20000,
+                    policy_steps=128, b_path=False):
+    """Run single experiment
+    """
     if model is None:
         model = PPO2(MyCnnPolicy, env, n_steps = policy_steps)
     agent_rewards = []
     old_rewards = []
     episodes = []
-    for i in range(num_iterations + 1):
+    for i in range(n_episodes):
         model.learn(total_timesteps = num_steps)
         mean_reward, n_steps, legacy_reward = EvaluatePolicy(model,
                 model.get_env(), n_eval_episodes = 50, b_path = b_path)
         agent_rewards.append(mean_reward)
         old_rewards.append(legacy_reward)
         episodes.append(i)
-    agent_rewards = agent_rewards[-num_iterations:]
-    old_rewards = old_rewards[-num_iterations:]
-    episodes = episodes[:num_iterations]
+    agent_rewards = agent_rewards[-n_episodes:]
+    old_rewards = old_rewards[-n_episodes:]
+    episodes = episodes[:n_episodes]
     return agent_rewards, old_rewards, episodes
 
-def expSeveralRuns(args, n_e, n_s, n_repeat):
+def expSeveralRuns(args, n_e, n_s, n_experiments):
+    """Run multiple experiments and plot agent performance in one plot
+    """
     size = str(args['width']) + 'x' + str(args['height'])
     env_info = '_m' + str(args['n_modules'])
+    # Configure GPU settings
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    # config = tf.ConfigProto()
-    # config.gpu_options.allow_growth = True
+    # Make custom environment using MEDAEnv
     env = make_vec_env(MEDAEnv, wrapper_class=None,
                        n_envs = n_e, env_kwargs = args)
+    # Report GPU status
     showIsGPU()
+    # Initialize agent and old rewards
     a_rewards = []
     o_rewards = []
-    for i in range(n_repeat):
-        a_r, o_r, episodes = runAnExperiment(env, num_iterations = 3,
-                num_steps = 20000, policy_steps = n_s)
+    for i in range(n_experiments):
+        a_r, o_r, episodes = runAnExperiment(
+            env, n_episodes=3, num_steps=20000, policy_steps=n_s)
         a_rewards.append(a_r)
         o_rewards.append(o_r)
     plotAgentPerformance(a_rewards, o_rewards, size, env_info)
+    return
 
 if __name__ == '__main__':
     t0 = time.time()
-    sizes = [30]
+    sizes = [15]
     for s in sizes:
         args = {'width': s, 'height': s,
                 'n_modules': 0,
                 'b_degrade': True,
                 'per_degrade': 0.1}
-        expSeveralRuns(args, n_e = 1, n_s = 64, n_repeat = 1)
+        expSeveralRuns(args, n_e = 1, n_s = 64, n_experiments = 1)
     t1 = time.time()
     print("Time = %d seconds" % (t1-t0))
     print('### Finished train.py successfully ###')
