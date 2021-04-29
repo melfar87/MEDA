@@ -54,29 +54,7 @@ def EvaluatePolicy(model, env,
     mean_legacy = np.mean(legacy_rewards)
     return mean_reward, n_steps, mean_legacy
 
-def runAnExperiment(
-        env,
-        model = None,
-        num_iterations = 50,
-        num_steps = 20000,
-        policy_steps = 128,
-        b_path = False):
-    if model is None:
-        model = PPO2(MyCnnPolicy, env, n_steps = policy_steps)
-    agent_rewards = []
-    old_rewards = []
-    episodes = []
-    for i in range(num_iterations + 1):
-        model.learn(total_timesteps = num_steps)
-        mean_reward, n_steps, legacy_reward = EvaluatePolicy(model,
-                model.get_env(), n_eval_episodes = 50, b_path = b_path)
-        agent_rewards.append(mean_reward)
-        old_rewards.append(legacy_reward)
-        episodes.append(i)
-    agent_rewards = agent_rewards[-num_iterations:]
-    old_rewards = old_rewards[-num_iterations:]
-    episodes = episodes[:num_iterations]
-    return agent_rewards, old_rewards, episodes
+
 
 def showIsGPU():
     if tf.test.is_gpu_available():
@@ -117,10 +95,35 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
         plt.tight_layout()
         plt.savefig('log/' + size + env_info + '.png')
 
+
+def runAnExperiment(
+        env,
+        model = None,
+        num_iterations = 50,
+        num_steps = 20000,
+        policy_steps = 128,
+        b_path = False):
+    if model is None:
+        model = PPO2(MyCnnPolicy, env, n_steps = policy_steps)
+    agent_rewards = []
+    old_rewards = []
+    episodes = []
+    for i in range(num_iterations + 1):
+        model.learn(total_timesteps = num_steps)
+        mean_reward, n_steps, legacy_reward = EvaluatePolicy(model,
+                model.get_env(), n_eval_episodes = 50, b_path = b_path)
+        agent_rewards.append(mean_reward)
+        old_rewards.append(legacy_reward)
+        episodes.append(i)
+    agent_rewards = agent_rewards[-num_iterations:]
+    old_rewards = old_rewards[-num_iterations:]
+    episodes = episodes[:num_iterations]
+    return agent_rewards, old_rewards, episodes
+
 def expSeveralRuns(args, n_e, n_s, n_repeat):
     size = str(args['width']) + 'x' + str(args['height'])
     env_info = '_m' + str(args['n_modules'])
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2,allow_growth=True)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     # config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True

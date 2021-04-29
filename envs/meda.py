@@ -195,7 +195,8 @@ class MEDAEnv(gym.Env):
         return obs, reward, done, {}
 
     def render(self, mode='human'):
-        """ Show environment """
+        """Show environment
+        """
         # goal:2, pos:1, blocks:-1, degrade: -2
         if mode == 'human':
             img = np.zeros(shape= \
