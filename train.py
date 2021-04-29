@@ -96,9 +96,9 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
         plt.savefig('log/' + size + env_info + '.png')
 
 
-def runAnExperiment(env, model=None, n_episodes=50, num_steps=20000,
+def runAnExperiment(env, model=None, n_episodes=50, n_steps=20000,
                     policy_steps=128, b_path=False):
-    """Run single experiment
+    """Run single experiment consisting of a number of episodes
     """
     if model is None:
         model = PPO2(MyCnnPolicy, env, n_steps = policy_steps)
@@ -106,7 +106,7 @@ def runAnExperiment(env, model=None, n_episodes=50, num_steps=20000,
     old_rewards = []
     episodes = []
     for i in range(n_episodes):
-        model.learn(total_timesteps = num_steps)
+        model.learn(total_timesteps = n_steps)
         mean_reward, n_steps, legacy_reward = EvaluatePolicy(model,
                 model.get_env(), n_eval_episodes = 50, b_path = b_path)
         agent_rewards.append(mean_reward)
@@ -135,7 +135,7 @@ def expSeveralRuns(args, n_e, n_s, n_experiments):
     o_rewards = []
     for i in range(n_experiments):
         a_r, o_r, episodes = runAnExperiment(
-            env, n_episodes=3, num_steps=20000, policy_steps=n_s)
+            env, n_episodes=3, n_steps=20000, policy_steps=n_s)
         a_rewards.append(a_r)
         o_rewards.append(o_r)
     plotAgentPerformance(a_rewards, o_rewards, size, env_info)
@@ -143,13 +143,13 @@ def expSeveralRuns(args, n_e, n_s, n_experiments):
 
 if __name__ == '__main__':
     t0 = time.time()
-    sizes = [15]
+    sizes = [30]
     for s in sizes:
         args = {'width': s, 'height': s,
                 'n_modules': 0,
                 'b_degrade': True,
                 'per_degrade': 0.1}
-        expSeveralRuns(args, n_e = 1, n_s = 64, n_experiments = 1)
+        expSeveralRuns(args, n_e = 5, n_s = 64, n_experiments = 1)
     t1 = time.time()
     print("Time = %d seconds" % (t1-t0))
     print('### Finished train.py successfully ###')
