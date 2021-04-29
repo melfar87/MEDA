@@ -137,11 +137,14 @@ def expSeveralRuns(args, n_e, n_s, n_repeat):
     plotAgentPerformance(a_rewards, o_rewards, size, env_info)
 
 if __name__ == '__main__':
-    sizes = [15]
+    t0 = time.time()
+    sizes = [30]
     for s in sizes:
         args = {'width': s, 'height': s,
                 'n_modules': 0,
                 'b_degrade': True,
                 'per_degrade': 0.1}
         expSeveralRuns(args, n_e = 1, n_s = 64, n_repeat = 1)
+    t1 = time.time()
+    print("Time = %d seconds" % (t1-t0))
     print('### Finished train.py successfully ###')
