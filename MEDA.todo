@@ -1,0 +1,4 @@
+MEDA:
+    ☐ Update default degradation behavior
+        ☐ Set default tau to 0.7
+        ☐ Set default c1, c2
