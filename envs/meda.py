@@ -67,7 +67,7 @@ class MEDAEnv(gym.Env):
         :param b_use_dict: Use dictionary for observation space if true
         """
         super(MEDAEnv, self).__init__()
-
+        self.reset_counter = 0
         # Instance variables
         assert height > 0 and width > 0
         self.height = height
@@ -76,9 +76,9 @@ class MEDAEnv(gym.Env):
         self.actions = Direction
         # Degradation parameters
         self.b_degrade = b_degrade
-        self.m_taus = np.ones((height, width))
-        self.m_C1s = np.zeros((height, width))
-        self.m_C2s = np.zeros((height, width))
+        self.m_taus = np.ones((height, width)) * 0.8
+        self.m_C1s = np.ones((height, width)) * 200
+        self.m_C2s = np.ones((height, width)) * 200
         # Degradation matrix
         self.m_degradation = np.ones((height, width))
         # Health matrix
@@ -137,6 +137,7 @@ class MEDAEnv(gym.Env):
         Returns:
             obs: Observation
         """
+        self.reset_counter += 1
         # Reset steps counter
         self.step_count = 0
         # Reset actuations matrix
@@ -150,6 +151,7 @@ class MEDAEnv(gym.Env):
         self._updateHealth()
         self.m_distance = self._getDistanceToGoal()
         obs = self._getObs()
+        print("Reset #%5d" % self.reset_counter)
         return obs
     
     def step(self, action):
