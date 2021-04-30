@@ -55,7 +55,7 @@ class MEDAEnv(gym.Env):
     """ MEDA biochip environment, following gym interface """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, height, width, n_bits=2, b_random=False, n_modules=0,
+    def __init__(self, width, height, n_bits=2, b_random=False, n_modules=0,
                  b_degrade=False, per_degrade=0.1, b_use_dict=False):
         """ Gym Constructor for MEDA
         :param height: Biochip height in microelectrodes
@@ -69,25 +69,25 @@ class MEDAEnv(gym.Env):
         super(MEDAEnv, self).__init__()
         self.reset_counter = 0
         # Instance variables
-        assert height > 0 and width > 0
+        assert height > 4 and width > 4
         self.height = height
         self.width = width
         self.n_bits = n_bits
         self.actions = Direction
         # Degradation parameters
         self.b_degrade = b_degrade
-        self.m_taus = np.ones((height, width)) * 0.8
-        self.m_C1s = np.ones((height, width)) * 200
-        self.m_C2s = np.ones((height, width)) * 200
+        self.m_taus = np.ones((width, height)) * 0.8
+        self.m_C1s = np.ones((width, height)) * 200
+        self.m_C2s = np.ones((width, height)) * 200
         # Degradation matrix
-        self.m_degradation = np.ones((height, width))
+        self.m_degradation = np.ones((width, height))
         # Health matrix
-        self.m_health = np.ones((height, width))
+        self.m_health = np.ones((width, height))
         # Actuations count matrix
-        self.m_actuations_count = np.zeros((height, width))
+        self.m_actuations_count = np.zeros((width, height))
         # Control pattern
-        self.m_pattern = np.zeros((height, width))
-        self.m_prev_pattern = np.zeros((height, width))
+        self.m_pattern = np.zeros((width, height))
+        self.m_prev_pattern = np.zeros((width, height))
         # Number of steps 
         self.step_count = 0
         # Maximum number of steps
@@ -99,10 +99,10 @@ class MEDAEnv(gym.Env):
             self.observation_space = spaces.Dict({
                 'health': spaces.Box(
                     low=0, high=2**n_bits-1,
-                    shape=(height, width, 1), dtype=np.uint8),
+                    shape=(width, height, 1), dtype=np.uint8),
                 'sensors': spaces.Box(
                     low=0, high=1,
-                    shape=(height, width), dtype=np.uint8)
+                    shape=(width, height), dtype=np.uint8)
             })
             self.keys = list(self.observation_space.spaces.keys())
         else:
@@ -114,9 +114,9 @@ class MEDAEnv(gym.Env):
             self.n_layers = 3 + 1
             self.observation_space = spaces.Box(
                 low=0, high=1,
-                shape=(height, width, self.n_layers), dtype=np.float)
+                shape=(width, height, self.n_layers), dtype=np.float)
             self.default_observation = np.zeros(
-                shape=(height, width, self.n_layers), dtype=np.float)
+                shape=(width, height, self.n_layers), dtype=np.float)
         self.reward_range = (-1.0, 1.0)
         
         # Reset actuations matrix
@@ -151,7 +151,7 @@ class MEDAEnv(gym.Env):
         self._updateHealth()
         self.m_distance = self._getDistanceToGoal()
         obs = self._getObs()
-        print("Reset #%5d" % self.reset_counter)
+        # print("Reset #%5d" % self.reset_counter)
         return obs
     
     def step(self, action):
@@ -262,7 +262,7 @@ class MEDAEnv(gym.Env):
     def _resetActuationMatrix(self):
         """Resets actuation matrix
         """
-        self.m_actuations_count = np.zeros((self.height, self.width))
+        self.m_actuations_count = np.zeros((self.width, self.height))
         return
     
     def _updatePattern(self, action):
