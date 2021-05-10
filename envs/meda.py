@@ -91,7 +91,7 @@ class MEDAEnv(gym.Env):
         # Number of steps 
         self.step_count = 0
         # Maximum number of steps
-        self.max_step = 2 * (height + width)
+        self.max_step = 4 * (height + width)
 
         # Gym environment: action space
         self.action_space = spaces.Discrete(len(self.actions))
