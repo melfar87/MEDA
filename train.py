@@ -2,6 +2,7 @@
 
 import os
 import time
+import datetime
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -18,6 +19,9 @@ from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
 from stable_baselines.common.evaluation import evaluate_policy
 from stable_baselines import PPO2
 
+def getTimeStamp():
+    now = datetime.datetime.now()
+    return now.strftime('%Y%m%d-%H%M')
 
 def legacyReward(env, b_path = False):
     """ Return the reward of a game if a legacy
@@ -96,7 +100,7 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
         plt.savefig('log/' + size + env_info + '.png')
 
 
-def runAnExperiment(env, model=None, n_episodes=50, n_steps=20000,
+def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
                     policy_steps=128, b_path=False):
     """Run single experiment consisting of a number of episodes
     """
@@ -105,51 +109,57 @@ def runAnExperiment(env, model=None, n_episodes=50, n_steps=20000,
     agent_rewards = []
     old_rewards = []
     episodes = []
-    for i in range(n_episodes):
+    for i in range(n_epochs):
+        print("INFO: Epoch %2d started" % i)
         model.learn(total_timesteps = n_steps)
         mean_reward, n_steps, legacy_reward = EvaluatePolicy(model,
-                model.get_env(), n_eval_episodes = 50, b_path = b_path)
+                model.get_env(), n_eval_episodes = 100, b_path = b_path)
         agent_rewards.append(mean_reward)
         old_rewards.append(legacy_reward)
         episodes.append(i)
-    agent_rewards = agent_rewards[-n_episodes:]
-    old_rewards = old_rewards[-n_episodes:]
-    episodes = episodes[:n_episodes]
-    return agent_rewards, old_rewards, episodes
+        print("INFO: Epoch %2d ended" % i)
+    agent_rewards = agent_rewards[-n_epochs:]
+    old_rewards = old_rewards[-n_epochs:]
+    episodes = episodes[:n_epochs]
+    return agent_rewards, old_rewards, episodes, model
 
-def expSeveralRuns(args, n_e, n_s, n_experiments):
+def expSeveralRuns(args, n_envs, n_s, n_experiments):
     """Run multiple experiments and plot agent performance in one plot
     """
     size = str(args['width']) + 'x' + str(args['height'])
-    env_info = '_m' + str(args['n_modules'])
     # Configure GPU settings
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     # Make custom environment using MEDAEnv
-    env = make_vec_env(MEDAEnv, wrapper_class=None,
-                       n_envs = n_e, env_kwargs = args)
+    env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=args)
     # Report GPU status
     showIsGPU()
     # Initialize agent and old rewards
     a_rewards = []
     o_rewards = []
+    n_epochs = 64
     for i in range(n_experiments):
-        a_r, o_r, episodes = runAnExperiment(
-            env, n_episodes=3, n_steps=20000, policy_steps=n_s)
+        a_r, o_r, episodes, model = runAnExperiment(
+            env, n_epochs=n_epochs, n_steps=20000, policy_steps=n_s)
         a_rewards.append(a_r)
         o_rewards.append(o_r)
+        if b_backup_model:
+            model.save("data/model_%s" % getTimeStamp())
+    env_info = '_E' + str(n_epochs)
     plotAgentPerformance(a_rewards, o_rewards, size, env_info)
     return
 
 if __name__ == '__main__':
+    b_backup_model = True
     t0 = time.time()
-    sizes = [30]
+    # Sizes are (width, height)
+    sizes = [(60,30),]
     for s in sizes:
-        args = {'width': s, 'height': s,
+        args = {'width': s[1], 'height': s[0],
                 'n_modules': 0,
                 'b_degrade': True,
                 'per_degrade': 0.1}
-        expSeveralRuns(args, n_e = 5, n_s = 64, n_experiments = 1)
+        expSeveralRuns(args, n_envs=16, n_s=64, n_experiments=1)
     t1 = time.time()
     print("Time = %d seconds" % (t1-t0))
     print('### Finished train.py successfully ###')
