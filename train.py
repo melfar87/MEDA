@@ -110,6 +110,7 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
     old_rewards = []
     episodes = []
     for i in range(n_epochs):
+        t2s = time.time()
         print("INFO: Epoch %2d started" % i)
         model.learn(total_timesteps = n_steps)
         mean_reward, n_steps, legacy_reward = EvaluatePolicy(model,
@@ -117,7 +118,8 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         agent_rewards.append(mean_reward)
         old_rewards.append(legacy_reward)
         episodes.append(i)
-        print("INFO: Epoch %2d ended" % i)
+        t2e = time.time()
+        print("INFO: Epoch %2d ended in %d seconds" % (i,t2e-t2s))
     agent_rewards = agent_rewards[-n_epochs:]
     old_rewards = old_rewards[-n_epochs:]
     episodes = episodes[:n_epochs]
@@ -128,7 +130,8 @@ def expSeveralRuns(args, n_envs, n_s, n_experiments):
     """
     size = str(args['width']) + 'x' + str(args['height'])
     # Configure GPU settings
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
+    # per_process_gpu_memory_fraction=0.01,
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2,allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     # Make custom environment using MEDAEnv
     env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=args)
@@ -137,7 +140,7 @@ def expSeveralRuns(args, n_envs, n_s, n_experiments):
     # Initialize agent and old rewards
     a_rewards = []
     o_rewards = []
-    n_epochs = 64
+    n_epochs = 5
     for i in range(n_experiments):
         a_r, o_r, episodes, model = runAnExperiment(
             env, n_epochs=n_epochs, n_steps=20000, policy_steps=n_s)
@@ -145,7 +148,7 @@ def expSeveralRuns(args, n_envs, n_s, n_experiments):
         o_rewards.append(o_r)
         if b_backup_model:
             model.save("data/model_%s" % getTimeStamp())
-    env_info = '_E' + str(n_epochs)
+    env_info = '_E' + str(n_epochs) + '_A'
     plotAgentPerformance(a_rewards, o_rewards, size, env_info)
     return
 
@@ -159,7 +162,7 @@ if __name__ == '__main__':
                 'n_modules': 0,
                 'b_degrade': True,
                 'per_degrade': 0.1}
-        expSeveralRuns(args, n_envs=16, n_s=64, n_experiments=1)
+        expSeveralRuns(args, n_envs=4, n_s=64, n_experiments=1)
     t1 = time.time()
     print("Time = %d seconds" % (t1-t0))
     print('### Finished train.py successfully ###')
