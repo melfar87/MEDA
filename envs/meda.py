@@ -55,7 +55,8 @@ class MEDAEnv(gym.Env):
     """ MEDA biochip environment, following gym interface """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, width, height, n_bits=2, b_random=False, n_modules=0,
+    def __init__(self, width, height, droplet_sizes=[[4,4],], n_bits=2,
+                 b_random=False, n_modules=0,
                  b_degrade=False, per_degrade=0.1, b_use_dict=False):
         """ Gym Constructor for MEDA
         :param height: Biochip height in microelectrodes
@@ -92,6 +93,11 @@ class MEDAEnv(gym.Env):
         self.step_count = 0
         # Maximum number of steps
         self.max_step = 4 * (height + width)
+        # List of droplet sizes
+        self.droplet_sizes = droplet_sizes
+        # Droplet range
+        self.xs0range = [3,]
+        self.ys0range = [1,3,]
 
         # Gym environment: action space
         self.action_space = spaces.Discrete(len(self.actions))
@@ -254,8 +260,26 @@ class MEDAEnv(gym.Env):
         initialization and reset.
         """
         # [TODO] Implement random dr_0 and dr_g generator based on size
-        self.droplet = np.array((3,2,6,5))
-        self.goal = np.array((self.width-4-3,self.height-3-3,self.width-4,self.height-3))
+        # Select droplet size first
+        dr_width = self.droplet_sizes[0][0]
+        dr_height = self.droplet_sizes[0][1]
+        # Randomly generate initial state
+        # self.droplet = np.array((3,2,6,5))
+        xs0 = random.choice(self.xs0range)
+        ys0 = random.choice(self.ys0range)
+        # [TODO] Check whether droplet range is closed or half open
+        xs1 = xs0 + dr_width
+        ys1 = ys0 + dr_height
+        self.droplet = np.array((xs0,ys0,xs1,ys1))
+        
+        # Randomly generate goal state
+        # self.goal = np.array((self.width-4-3,self.height-3-3,self.width-4,self.height-3))
+        xg0 = random.randint(1,self.width-dr_width)
+        yg0 = random.randint(1,np.min((xg0,self.height-dr_height)))
+        xg1 = xg0 + dr_width
+        yg1 = yg0 + dr_height
+        self.goal = np.array((xg0,yg0,xg1,yg1))
+        
         self.agt_sta = copy.deepcopy(self.droplet)
         return
     

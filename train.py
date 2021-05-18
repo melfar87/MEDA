@@ -76,8 +76,8 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
     o_max = np.max(o_rewards, axis = 0)
     o_min = np.min(o_rewards, axis = 0)
     episodes = list(range(len(a_max)))
-    with plt.style.context('ggplot'):
-        plt.rcParams.update({'font.size': 20})
+    with plt.style.context('seaborn-paper'):
+        plt.rcParams.update({'font.size': 10, 'figure.figsize': (4,3)})
         plt.figure()
         plt.fill_between(episodes, a_max, a_min, facecolor = 'red', alpha = 0.3)
         plt.fill_between(episodes, o_max, o_min, facecolor = 'blue',
@@ -97,7 +97,13 @@ def plotAgentPerformance(a_rewards, o_rewards, size, env_info, b_path = False):
         else:
             plt.ylabel('Score')
         plt.tight_layout()
+        # Save PNG
         plt.savefig('log/' + size + env_info + '.png')
+        # Save TEX
+        import tikzplotlib
+        tikzplotlib.clean_figure()
+        tikzplotlib.save('log/' + size + env_info + '.tex')
+        #plt.savefig('log/' + size + env_info + '.pgf')
 
 
 def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
@@ -131,7 +137,7 @@ def expSeveralRuns(args, n_envs, n_s, n_experiments):
     size = str(args['width']) + 'x' + str(args['height'])
     # Configure GPU settings
     # per_process_gpu_memory_fraction=0.01,
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2,allow_growth=True)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     # Make custom environment using MEDAEnv
     env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=args)
@@ -148,21 +154,21 @@ def expSeveralRuns(args, n_envs, n_s, n_experiments):
         o_rewards.append(o_r)
         if b_backup_model:
             model.save("data/model_%s" % getTimeStamp())
-    env_info = '_E' + str(n_epochs) + '_A'
+    env_info = '_E' + str(n_epochs) + '_C'
     plotAgentPerformance(a_rewards, o_rewards, size, env_info)
     return
 
 if __name__ == '__main__':
-    b_backup_model = True
+    b_backup_model = False
     t0 = time.time()
     # Sizes are (width, height)
-    sizes = [(60,30),]
+    sizes = [(25,15),]
     for s in sizes:
         args = {'width': s[1], 'height': s[0],
                 'n_modules': 0,
                 'b_degrade': True,
                 'per_degrade': 0.1}
-        expSeveralRuns(args, n_envs=4, n_s=64, n_experiments=1)
+        expSeveralRuns(args, n_envs=8, n_s=64, n_experiments=1)
     t1 = time.time()
     print("Time = %d seconds" % (t1-t0))
     print('### Finished train.py successfully ###')

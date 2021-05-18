@@ -258,7 +258,7 @@ class DMFBEnv(gym.Env):
         y = random.randrange(0, self.width)
         start = (y, x)
         repeat = random.randrange(0, self.length * self.width)
-        for i in range(repeate):
+        for i in range(repeat):
             x = random.randrange(0, self.length)
             y = random.randrange(0, self.width)
         end = (y, x)
