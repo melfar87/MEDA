@@ -230,12 +230,12 @@ if __name__ == '__main__':
     # List of args default values
     def_args = {
         'verbose':  '1',
-        'size':     (30,30),
+        'size':     (15,10),
         'droplet_sizes': [[4,4],],
-        'n_envs':   8,
+        'n_envs':   1,
         'n_s':      64,
         'n_exps':   1,
-        'n_epochs': 50,
+        'n_epochs': 21,
         'n_steps': 20000,
         'b_save_model': False,
         's_model_name': 'model',

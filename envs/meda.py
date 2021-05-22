@@ -8,15 +8,27 @@ from enum import IntEnum
 
 import gym
 from gym import error, spaces, utils
+# from gym.wrappers import ResizeObservation
+import cv2
 from gym.utils import seeding
 
 
+class DirectionSimple(IntEnum):
+    NN = 0  # North
+    EE = 1  # East
+    SS = 2  # South
+    WW = 3  # West
+    
 
 class Direction(IntEnum):
-    N = 0  # North
-    E = 1  # East
-    S = 2  # South
-    W = 3  # West
+    NN = 0  # North
+    EE = 1  # East
+    SS = 2  # South
+    WW = 3  # West
+    NE = 4  # N. East
+    NW = 5  # N. West
+    SE = 6  # S. East
+    SW = 7  # S. West
 
 
 
@@ -62,7 +74,9 @@ class MEDAEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, width=0, height=0, droplet_sizes=[[4,4],], n_bits=2,
-                 b_degrade=True, per_degrade=0.1, b_use_dict=False, **kwargs):
+                 b_degrade=True, per_degrade=0.1, b_use_dict=False,
+                 b_unify_obs=True, b_parm_step=True,
+                 **kwargs):
         """ Gym Constructor for MEDA
         :param height: Biochip height in microelectrodes
         :param width: Biochip width in microelectrodes
@@ -80,6 +94,8 @@ class MEDAEnv(gym.Env):
         self.width = width
         assert height > 4 and width > 4
         self.n_bits = n_bits
+        self.b_unify_obs = b_unify_obs
+        self.b_parm_step = b_parm_step
         self.actions = Direction
         # Degradation parameters
         self.b_degrade = b_degrade
@@ -124,11 +140,19 @@ class MEDAEnv(gym.Env):
                 # 2: sensors,
                 # 3: health )
             self.n_layers = 3 + 1
-            self.observation_space = spaces.Box(
-                low=0, high=1,
-                shape=(width, height, self.n_layers), dtype=np.float)
             self.default_observation = np.zeros(
                 shape=(width, height, self.n_layers), dtype=np.float)
+            if self.b_unify_obs:
+                # Use unified observation size
+                self.observation_space = spaces.Box(
+                    low=0, high=1,
+                    shape=(30, 30, self.n_layers), dtype=np.float)
+            else:
+                # Use biochip size for observation
+                self.observation_space = spaces.Box(
+                    low=0, high=1,
+                    shape=(width, height, self.n_layers), dtype=np.float)
+                
         self.reward_range = (-1.0, 1.0)
         
         # Reset actuations matrix
@@ -315,37 +339,40 @@ class MEDAEnv(gym.Env):
         """
         x0,y0,x1,y1 = self.droplet
         # Find the shift in position
-        if   action == Direction.N and self.droplet[3] < self.height:
+        if   action == Direction.NN and self.droplet[3] < self.height:
             tmpShift = [ 0,+1, 0,+1]
             tmpFront = self.m_degradation[x0:x1,y1]
-        elif action == Direction.S and self.droplet[1] > 0:
+        elif action == Direction.SS and self.droplet[1] > 0:
             tmpShift = [ 0,-1, 0,-1]
             tmpFront = self.m_degradation[x0:x1,y0-1]
-        elif action == Direction.E and self.droplet[2] < self.width:
+        elif action == Direction.EE and self.droplet[2] < self.width:
             tmpShift = [+1, 0,+1, 0]
             tmpFront = self.m_degradation[x1,y0:y1]
-        elif action == Direction.W and self.droplet[0] > 0:
+        elif action == Direction.WW and self.droplet[0] > 0:
             tmpShift = [-1, 0,-1, 0]
             tmpFront = self.m_degradation[x0-1,y0:y1]
+        elif action == Direction.NE:
+            tmpShift = [+1,+1,+1,+1]
+        elif action == Direction.NW:
+            tmpShift = [-1,+1,-1,+1]
+        elif action == Direction.SE:
+            tmpShift = [+1,-1,+1,-1]
+        elif action == Direction.SW:
+            tmpShift = [-1,-1,-1,-1]
         else:
             tmpShift = [ 0, 0, 0, 0]
             tmpFront = [1,]
         # Update pattern
-        tmpDr = self.droplet + tmpShift # New droplet location
+        if self.b_parm_step:
+            pass
+        else:
+            tmpDr = self.droplet + tmpShift # New droplet location
         self.m_prev_pattern = np.copy(self.m_pattern)
         self.m_pattern[:,:] = 0 # Reset pattern
         self.m_pattern[tmpDr[0]:tmpDr[2],tmpDr[1]:tmpDr[3]] = 1 # New pattern
         # Update position
         if self.b_degrade:
             prob = np.mean(tmpFront)
-            # if self.m_health[next_p[0]][next_p[1]] < 0.2:
-            #    prob = 0.2
-            # elif self.m_health[next_p[0]][next_p[1]] < 0.5:
-            #    prob = 0.5
-            # elif self.m_health[next_p[0]][next_p[1]] < 0.7:
-            #    prob = 0.7
-            # else:
-            #    prob = 1.0
         else:
             prob = 1
         # Draw a sample from the bernolli distribution Bern(prob)
@@ -382,6 +409,30 @@ class MEDAEnv(gym.Env):
         """
         # obs = np.zeros(shape=(self.height, self.width, self.n_layers))
         # obs = self._addModulesInObs(obs)
+        obs = np.zeros_like(self.default_observation)
+        # Goal layer
+        x0,y0,x1,y1 = self.goal
+        obs[y0:y1+1,x0:x1+1,1] = 1
+        # Droplet layer
+        x0,y0,x1,y1 = self.droplet
+        obs[y0:y1+1,x0:x1+1,2] = 1
+        # Health layer
+        obs[:,:,3] = self.m_health
+        if self.b_unify_obs:
+            obs = cv2.resize(
+                obs, (30, 30),
+                interpolation=cv2.INTER_AREA
+            )
+        return obs
+    
+    
+    def _getUnifiedObs(self):
+        """
+        0: Obstacles,
+        1: Goal,
+        2: Droplet,
+        3: Health
+        """
         obs = np.zeros_like(self.default_observation)
         # Goal layer
         x0,y0,x1,y1 = self.goal
