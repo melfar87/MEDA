@@ -156,23 +156,25 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
 
 
 # def expSeveralRuns(args, n_envs, n_s, n_experiments):
-def expSeveralRuns(args, n_envs, n_s, n_experiments):
+def expSeveralRuns(args):
     """Run multiple experiments and plot agent performance in one plot
     """
     
     # Load configuration
-    n_envs = args['n_envs']
-    n_epochs = args['n_epochs']
-    n_steps = args['n_steps']
-    b_save_model = args['b_save_model']
-    str_load_model = args['s_load_model']
+    n_s = args.n_s
+    n_experiments = args.n_exps
+    n_envs = args.n_envs
+    n_epochs = args.n_epochs
+    n_steps = args.n_steps
+    b_save_model = args.b_save_model
+    str_load_model = args.s_load_model
     
-    str_size = str(args['width']) + 'x' + str(args['height'])
+    str_size = str(args.size[0]) + 'x' + str(args.size[1])
     
     # Configure GPU settings, make environment, and report GPU status
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=args)
+    env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=vars(args))
     showIsGPU()
     
     # Initialize agent and old rewards
@@ -229,7 +231,7 @@ if __name__ == '__main__':
     def_args = {
         'verbose':  '1',
         'size':     (30,30),
-        'droplet_range': (4,5,6),
+        'droplet_sizes': [[4,4],],
         'n_envs':   8,
         'n_s':      64,
         'n_exps':   1,
@@ -244,15 +246,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MEDA Training Module')
     parser.add_argument('-v','--verbose',type=str,default=def_args['verbose'])
     parser.add_argument('-s','--size',type=tuple,default=def_args['size'])
-    parser.add_argument('--droplet-range',type=tuple,default=def_args['droplet_range'])
-    parser.add_argument('--envs',type=int,default=def_args['n_envs'])
+    parser.add_argument('--droplet-sizes',type=list,default=def_args['droplet_sizes'])
+    parser.add_argument('--n-envs',type=int,default=def_args['n_envs'])
     parser.add_argument('--n-s',type=int,default=def_args['n_s'])
-    parser.add_argument('--exps',type=int,default=def_args['n_exps'])
-    parser.add_argument('--epochs',type=int,default=def_args['n_epochs'])
-    parser.add_argument('--steps',type=int,default=def_args['n_steps'])
-    parser.add_argument('--save-model',type=bool,default=def_args['b_save_model'])
-    parser.add_argument('--name',type=str,default=def_args['s_model_name'])
-    parser.add_argument('--load-model',type=str,default=def_args['s_load_model'])
+    parser.add_argument('--n-exps',type=int,default=def_args['n_exps'])
+    parser.add_argument('--n-epochs',type=int,default=def_args['n_epochs'])
+    parser.add_argument('--n-steps',type=int,default=def_args['n_steps'])
+    parser.add_argument('--b-save-model',type=bool,default=def_args['b_save_model'])
+    parser.add_argument('--s-model-name',type=str,default=def_args['s_model_name'])
+    parser.add_argument('--s-load-model',type=str,default=def_args['s_load_model'])
     args = parser.parse_args()
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose

@@ -61,9 +61,8 @@ class MEDAEnv(gym.Env):
     """ MEDA biochip environment, following gym interface """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, width, height, droplet_sizes=[[4,4],], n_bits=2,
-                 b_random=False, n_modules=0,
-                 b_degrade=False, per_degrade=0.1, b_use_dict=False):
+    def __init__(self, width=0, height=0, droplet_sizes=[[4,4],], n_bits=2,
+                 b_degrade=True, per_degrade=0.1, b_use_dict=False, **kwargs):
         """ Gym Constructor for MEDA
         :param height: Biochip height in microelectrodes
         :param width: Biochip width in microelectrodes
@@ -74,11 +73,12 @@ class MEDAEnv(gym.Env):
         :param b_use_dict: Use dictionary for observation space if true
         """
         super(MEDAEnv, self).__init__()
+        width, height = kwargs['size']
         self.reset_counter = 0
         # Instance variables
-        assert height > 4 and width > 4
         self.height = height
         self.width = width
+        assert height > 4 and width > 4
         self.n_bits = n_bits
         self.actions = Direction
         # Degradation parameters
