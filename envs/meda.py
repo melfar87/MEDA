@@ -11,11 +11,13 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 
 
+
 class Direction(IntEnum):
     N = 0  # North
     E = 1  # East
     S = 2  # South
     W = 3  # West
+
 
 
 class Module:
@@ -27,6 +29,7 @@ class Module:
         self.y_min = y_min
         self.y_max = y_max
 
+
     def isPointInside(self, point):
         ''' point is in the form of (y, x) '''
         if point[0] >= self.y_min and point[0] <= self.y_max and \
@@ -35,12 +38,14 @@ class Module:
         else:
             return False
 
+
     def isModuleOverlap(self, m):
         if self._isLinesOverlap(self.x_min, self.x_max, m.x_min, m.x_max) and \
                 self._isLinesOverlap(self.y_min, self.y_max, m.y_min, m.y_max):
             return True
         else:
             return False
+
 
     def _isLinesOverlap(self, xa_1, xa_2, xb_1, xb_2):
         if xa_1 > xb_2:
@@ -49,6 +54,7 @@ class Module:
             return False
         else:
             return True
+
 
 
 class MEDAEnv(gym.Env):
@@ -78,7 +84,7 @@ class MEDAEnv(gym.Env):
         # Degradation parameters
         self.b_degrade = b_degrade
         self.m_taus = np.ones((width, height)) * 0.8
-        self.m_C1s = np.ones((width, height)) * 200
+        self.m_C1s = np.ones((width, height)) * 0
         self.m_C2s = np.ones((width, height)) * 200
         # Degradation matrix
         self.m_degradation = np.ones((width, height))
@@ -87,12 +93,12 @@ class MEDAEnv(gym.Env):
         # Actuations count matrix
         self.m_actuations_count = np.zeros((width, height))
         # Control pattern
-        self.m_pattern = np.zeros((width, height))
+        self.m_pattern = np.zeros((width, height), dtype=np.uint8)
         self.m_prev_pattern = np.zeros((width, height))
         # Number of steps 
         self.step_count = 0
         # Maximum number of steps
-        self.max_step = 4 * (height + width)
+        self.max_step = 2 * (height + width)
         # List of droplet sizes
         self.droplet_sizes = droplet_sizes
         # Droplet range
@@ -136,6 +142,7 @@ class MEDAEnv(gym.Env):
         
         return
 
+
     # Gym Interfaces
     def reset(self):
         """Reset environment state 
@@ -147,7 +154,7 @@ class MEDAEnv(gym.Env):
         # Reset steps counter
         self.step_count = 0
         # Reset actuations matrix
-        self._resetActuationMatrix()
+        self._resetActuationMatrix(is_random=False)
         # Get new start and goal locations and reset initial state
         self._resetInitialState()
         # Reset actuation pattern
@@ -159,6 +166,7 @@ class MEDAEnv(gym.Env):
         obs = self._getObs()
         # print("Reset #%5d" % self.reset_counter)
         return obs
+    
     
     def step(self, action):
         """Execute one step
@@ -188,8 +196,10 @@ class MEDAEnv(gym.Env):
         obs = self._getObs()
         # Compute rewards
         done = False
+        b_at_goal = 0
         if self._isComplete():
             reward = 1.0
+            b_at_goal = 1
             done = True
         elif self.step_count > self.max_step:
             reward = -0.8
@@ -200,7 +210,8 @@ class MEDAEnv(gym.Env):
             reward = -0.3
         else:  # move away the goal
             reward = -0.8
-        return obs, reward, done, {}
+        return obs, reward, done, {"b_at_goal":b_at_goal, "num_cycles":self.step_count}
+
 
     def render(self, mode='human'):
         """Show environment
@@ -242,6 +253,7 @@ class MEDAEnv(gym.Env):
             raise RuntimeError(
                 'Unknown mode in render')
 
+
     def close(self):
         """ close render view """
         pass
@@ -251,9 +263,11 @@ class MEDAEnv(gym.Env):
     def _getCenter(self, dr):
         return ( (dr[0]+dr[2])/2.0 , (dr[1]+dr[3])/2.0 )
     
+    
     def _getDistanceToGoal(self):
         dist = np.mean(np.abs(self.goal - self.droplet))
         return dist
+        
         
     def _resetInitialState(self):
         """Returns droplet start and goal locations. Gets called upon
@@ -283,11 +297,18 @@ class MEDAEnv(gym.Env):
         self.agt_sta = copy.deepcopy(self.droplet)
         return
     
-    def _resetActuationMatrix(self):
+    
+    def _resetActuationMatrix(self, is_random=False):
         """Resets actuation matrix
         """
-        self.m_actuations_count = np.zeros((self.width, self.height))
+        if is_random:
+            self.m_actuations_count = np.random.randint(
+                0,2000,(self.width, self.height)
+            )
+        else:
+            self.m_actuations_count = np.zeros((self.width, self.height))
         return
+    
     
     def _updatePattern(self, action):
         """Update actuation pattern
@@ -336,6 +357,7 @@ class MEDAEnv(gym.Env):
             pass
         return
         
+        
     def _updateHealth(self):
         """Updates the degradation and health matrices
         """
@@ -347,8 +369,9 @@ class MEDAEnv(gym.Env):
             (self.m_actuations_count + self.m_C1s) / self.m_C2s )
         # Update health matrix from degradation matrix
         self.m_health = (
-            (np.ceil(self.m_degradation*(2**self.n_bits))-1)/(2**self.n_bits) )
+            (np.ceil(self.m_degradation*(2**self.n_bits)-0.5))/(2**self.n_bits) )
         return
+    
     
     def _getObs(self):
         """
@@ -369,6 +392,7 @@ class MEDAEnv(gym.Env):
         # Health layer
         obs[:,:,3] = self.m_health
         return obs
+
 
     def _isComplete(self):
         if np.array_equal(self.droplet, self.goal):
