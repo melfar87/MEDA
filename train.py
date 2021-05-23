@@ -172,8 +172,9 @@ def expSeveralRuns(args):
     str_size = str(args.size[0]) + 'x' + str(args.size[1])
     
     # Configure GPU settings, make environment, and report GPU status
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
-    sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+    if sys.platform != 'win32':
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
+        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=vars(args))
     showIsGPU()
     
