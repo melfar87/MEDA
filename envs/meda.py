@@ -5,6 +5,7 @@ import random
 import numpy as np
 from PIL import Image
 from enum import IntEnum
+import matplotlib.pyplot as plt
 
 import gym
 from gym import error, spaces, utils
@@ -71,7 +72,8 @@ class Module:
 
 class MEDAEnv(gym.Env):
     """ MEDA biochip environment, following gym interface """
-    metadata = {'render.modes': ['human']}
+    metadata = {'render.modes': ['human', 'rgb_array'],
+                'video.frames_per_second': 2}
 
     def __init__(self, width=0, height=0, droplet_sizes=[[4,4],], n_bits=2,
                  b_degrade=True, per_degrade=0.1, b_use_dict=False,
@@ -87,6 +89,7 @@ class MEDAEnv(gym.Env):
         :param b_use_dict: Use dictionary for observation space if true
         """
         super(MEDAEnv, self).__init__()
+        self.viewer = None
         width, height = kwargs['size']
         self.reset_counter = 0
         # Instance variables
@@ -240,47 +243,75 @@ class MEDAEnv(gym.Env):
     def render(self, mode='human'):
         """Show environment
         """
-        # goal:2, pos:1, blocks:-1, degrade: -2
-        if mode == 'human':
-            img = np.zeros(shape= \
-                               (self.height, self.width))
-            img[self.goal[0]][self.goal[1]] = 2
-            img[self.droplet[0]][self.droplet[1]] = 1
-            for m in self.modules:
-                for y in range(m.y_min, m.y_max + 1):
-                    for x in range(
-                            m.x_min, m.x_max + 1):
-                        img[y][x] = -1
-            if self.b_degrade:
-                img[self.m_health < 0.5] = -2
-            return img
-        elif mode == 'rgb_array':
-            img = self._getObs().astype(np.uint8)
-            for y in range(self.height):
-                for x in range(self.width):
-                    if np.array_equal(img[y][x], [1, 0, 0]):  # red
-                        img[y][x] = [255, 0, 0]
-                    elif np.array_equal(img[y][x], [0, 1, 0]):  # gre
-                        img[y][x] = [0, 255, 0]
-                    elif np.array_equal(img[y][x], [0, 0, 1]):  # blu
-                        img[y][x] = [0, 0, 255]
-                    elif self.b_degrade and \
-                            self.m_health[y][x] < 0.5:  # ppl
-                        img[y][x] = [255, 102, 255]
-                    elif self.b_degrade and \
-                            self.m_health[y][x] < 0.7:  # ppl
-                        img[y][x] = [255, 153, 255]
-                    else:  # grey
-                        img[y][x] = [192, 192, 192]
-            return img
+        # screen_width = 600
+        # screen_height = 400
+        
+        # if self.viewer is None:
+        #     from gym.envs.classic_control import rendering
+        #     self.viewer = rendering.Viewer(screen_width, screen_height)
+        
+        if mode=='human':
+            obs_full = self._getObs(full_res=True)
+            plt.imshow(np.asarray(obs_full))
+            plt.axis('off')
+            plt.draw()
+            plt.pause(0.001)
+
+        elif mode=='rgb_array':
+            pass
         else:
-            raise RuntimeError(
-                'Unknown mode in render')
+            return None
+        
+        #return self.viewer.render(return_rgb_array=mode == 'rgb_array')
+        
+        # goal:2, pos:1, blocks:-1, degrade: -2
+        # if mode == 'human':
+        #     img = np.zeros(shape= \
+        #                        (self.height, self.width))
+        #     img[self.goal[0]][self.goal[1]] = 2
+        #     img[self.droplet[0]][self.droplet[1]] = 1
+        #     for m in self.modules:
+        #         for y in range(m.y_min, m.y_max + 1):
+        #             for x in range(
+        #                     m.x_min, m.x_max + 1):
+        #                 img[y][x] = -1
+        #     if self.b_degrade:
+        #         img[self.m_health < 0.5] = -2
+        #     return img
+        # elif mode == 'rgb_array':
+        #     img = self._getObs().astype(np.uint8)
+        #     for y in range(self.height):
+        #         for x in range(self.width):
+        #             if np.array_equal(img[y][x], [1, 0, 0]):  # red
+        #                 img[y][x] = [255, 0, 0]
+        #             elif np.array_equal(img[y][x], [0, 1, 0]):  # gre
+        #                 img[y][x] = [0, 255, 0]
+        #             elif np.array_equal(img[y][x], [0, 0, 1]):  # blu
+        #                 img[y][x] = [0, 0, 255]
+        #             elif self.b_degrade and \
+        #                     self.m_health[y][x] < 0.5:  # ppl
+        #                 img[y][x] = [255, 102, 255]
+        #             elif self.b_degrade and \
+        #                     self.m_health[y][x] < 0.7:  # ppl
+        #                 img[y][x] = [255, 153, 255]
+        #             else:  # grey
+        #                 img[y][x] = [192, 192, 192]
+        #     return img
+        # else:
+        #     raise RuntimeError(
+        #         'Unknown mode in render')
+        
+        return
 
 
     def close(self):
-        """ close render view """
-        pass
+        """close render view
+        """
+        if self.viewer:
+            self.viewer.close()
+            self.viewer = None
+        
+        return
 
 
     # Private functions
@@ -468,7 +499,7 @@ class MEDAEnv(gym.Env):
         return
     
     
-    def _getObs(self):
+    def _getObs(self, full_res=False):
         """
         0: Obstacles,
         1: Goal,
@@ -480,13 +511,15 @@ class MEDAEnv(gym.Env):
         obs = np.zeros_like(self.default_observation)
         # Goal layer
         x0,y0,x1,y1 = self.goal
-        obs[y0:y1+1,x0:x1+1,1] = 1
+        # obs[y0:y1+1,x0:x1+1,1] = 1
+        obs[x0:x1,y0:y1,1] = 1
         # Droplet layer
         x0,y0,x1,y1 = self.droplet
-        obs[y0:y1+1,x0:x1+1,2] = 1
+        # obs[y0:y1+1,x0:x1+1,2] = 1
+        obs[x0:x1,y0:y1,2] = 1
         # Health layer
         obs[:,:,3] = self.m_health
-        if self.b_unify_obs:
+        if self.b_unify_obs and not full_res:
             obs = cv2.resize(
                 obs, (30, 30),
                 interpolation=cv2.INTER_AREA
@@ -494,25 +527,6 @@ class MEDAEnv(gym.Env):
         return obs
     
     
-    def _getUnifiedObs(self):
-        """
-        0: Obstacles,
-        1: Goal,
-        2: Droplet,
-        3: Health
-        """
-        obs = np.zeros_like(self.default_observation)
-        # Goal layer
-        x0,y0,x1,y1 = self.goal
-        obs[y0:y1+1,x0:x1+1,1] = 1
-        # Droplet layer
-        x0,y0,x1,y1 = self.droplet
-        obs[y0:y1+1,x0:x1+1,2] = 1
-        # Health layer
-        obs[:,:,3] = self.m_health
-        return obs
-
-
     def _isComplete(self):
         if np.array_equal(self.droplet, self.goal):
             return True

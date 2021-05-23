@@ -35,7 +35,7 @@ def legacyReward(env, b_path = False):
 
 
 def EvaluatePolicy(model, env,
-        n_eval_episodes = 100, b_path = False):
+        n_eval_episodes = 100, b_path = False, render=False):
     episode_rewards = []
     legacy_rewards = []
     reached_goal = []
@@ -49,6 +49,9 @@ def EvaluatePolicy(model, env,
         while not done:
             action, state = model.predict(obs)
             obs, reward, done, _info = env.step(action)
+            if render:
+                env.render()
+                # time.sleep(0.001)
             b_at_goal = _info[0]["b_at_goal"]
             # cycles = _info[0]["num_cycles"]
             reward = reward[0]
@@ -140,7 +143,8 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         print("INFO: Epoch %2d started" % i)
         model.learn(total_timesteps = n_steps)
         mean_reward, n_steps, legacy_reward, reach_goal, mean_cycle = \
-            EvaluatePolicy(model, model.get_env(), n_eval_episodes = 100, b_path = b_path)
+            EvaluatePolicy(model, model.get_env(), n_eval_episodes = 100,
+                           b_path=b_path, render=True)
         agent_rewards.append(mean_reward)
         old_rewards.append(legacy_reward)
         episodes.append(i)
