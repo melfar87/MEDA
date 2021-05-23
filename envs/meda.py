@@ -110,7 +110,7 @@ class MEDAEnv(gym.Env):
         self.m_actuations_count = np.zeros((width, height))
         # Control pattern
         self.m_pattern = np.zeros((width, height), dtype=np.uint8)
-        self.m_prev_pattern = np.zeros((width, height))
+        # self.m_prev_pattern = np.zeros((width, height))
         # Number of steps 
         self.step_count = 0
         # Maximum number of steps
@@ -183,7 +183,7 @@ class MEDAEnv(gym.Env):
         self._resetInitialState()
         # Reset actuation pattern
         self.m_pattern[:,:] = 0
-        self.m_prev_pattern[:,:] = 0
+        # self.m_prev_pattern[:,:] = 0
         # Update health
         self._updateHealth()
         self.m_distance = self._getDistanceToGoal()
@@ -338,50 +338,118 @@ class MEDAEnv(gym.Env):
         """Update actuation pattern
         """
         x0,y0,x1,y1 = self.droplet
+        # Flags that indicate whether to check movement in a given direction:
+        moveN, moveS, moveE, moveW = False, False, False, False
         # Find the shift in position
-        if   action == Direction.NN and self.droplet[3] < self.height:
+        if   action == Direction.NN and y1 < self.height:
             tmpShift = [ 0,+1, 0,+1]
             tmpFront = self.m_degradation[x0:x1,y1]
-        elif action == Direction.SS and self.droplet[1] > 0:
+            moveN = True
+        elif action == Direction.SS and y0 > 0:
             tmpShift = [ 0,-1, 0,-1]
             tmpFront = self.m_degradation[x0:x1,y0-1]
-        elif action == Direction.EE and self.droplet[2] < self.width:
+            moveS = True
+        elif action == Direction.EE and x1 < self.width:
             tmpShift = [+1, 0,+1, 0]
             tmpFront = self.m_degradation[x1,y0:y1]
-        elif action == Direction.WW and self.droplet[0] > 0:
+            moveE = True
+        elif action == Direction.WW and x0 > 0:
             tmpShift = [-1, 0,-1, 0]
             tmpFront = self.m_degradation[x0-1,y0:y1]
-        elif action == Direction.NE:
+            moveW = True
+        elif action == Direction.NE and y1 < self.height and x1 < self.width:
             tmpShift = [+1,+1,+1,+1]
-        elif action == Direction.NW:
+            moveN, moveE = True, True
+        elif action == Direction.NW and y1 < self.height and x0 > 0:
             tmpShift = [-1,+1,-1,+1]
-        elif action == Direction.SE:
+            moveN, moveW = True, True
+        elif action == Direction.SE and y0 > 0 and x1 < self.width:
             tmpShift = [+1,-1,+1,-1]
-        elif action == Direction.SW:
+            moveS, moveE = True, True
+        elif action == Direction.SW and y0 > 0 and x0 > 0:
             tmpShift = [-1,-1,-1,-1]
+            moveS, moveW = True, True
         else:
             tmpShift = [ 0, 0, 0, 0]
             tmpFront = [1,]
-        # Update pattern
+            
+        # Compute new pattern
         if self.b_parm_step:
-            pass
+            # First, compute droplet radius
+            tmpRadius = np.floor_divide(self.droplet[[2,3]]-self.droplet[[0,1]],2)
+            # Shift as much as the radius
+            tmpShift = tmpShift * tmpRadius[[0,1,0,1]]
+            tmpDr = self.droplet + tmpShift
+            # Prevent target overshooting in y-axis
+            if (y0 < self.goal[1] < tmpDr[1]) or (y0 > self.goal[1] > tmpDr[1]):
+                tmpDr[[1,3]] = self.goal[[1,3]]
+            # Prevent target overshooting in x-axis
+            if (x0 < self.goal[0] < tmpDr[0]) or (x0 > self.goal[0] > tmpDr[0]):
+                tmpDr[[0,2]] = self.goal[[0,2]]
         else:
             tmpDr = self.droplet + tmpShift # New droplet location
-        self.m_prev_pattern = np.copy(self.m_pattern)
-        self.m_pattern[:,:] = 0 # Reset pattern
+        # self.m_prev_pattern = np.copy(self.m_pattern)
+        # Correct tmpDr if needed
+        if   tmpDr[0] < 0:           tmpDr[[0,2]] -= tmpDr[[0,0]]
+        elif tmpDr[2] > self.width:  tmpDr[[0,2]] -= tmpDr[[2,2]] - self.width
+        if   tmpDr[1] < 0:           tmpDr[[1,3]] -= tmpDr[[1,1]]
+        elif tmpDr[3] > self.height: tmpDr[[1,3]] -= tmpDr[[3,3]] - self.height
+        # Reset pattern
+        self.m_pattern[:,:] = 0
+        # Note: if tmpDr range is beyond m_pattern, the outskirts are ignored
         self.m_pattern[tmpDr[0]:tmpDr[2],tmpDr[1]:tmpDr[3]] = 1 # New pattern
+        
+        # Apply probabilistic movements
+        dr = self.droplet
+        while (moveN or moveS or moveE or moveW):
+            # x0,y0,x1,y1 = self.droplet
+            probN, probS, probE, probW = 0, 0, 0, 0
+            if moveN:
+                if dr[3] < self.height:
+                    probN = (
+                        np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[3]],
+                            self.m_degradation[dr[0]-1:dr[2]+1,dr[3]]) /
+                        self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum() )
+                moveN = ( random.random() <= probN )
+            elif moveS:
+                if dr[1] > 0:
+                    probS = (
+                        np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1],
+                            self.m_degradation[dr[0]-1:dr[2]+1,dr[1]-1]) /
+                        self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1].sum() )
+                moveS = ( random.random() <= probS )
+            if moveE:
+                if dr[2] < self.width:
+                    probE = (
+                        np.dot(self.m_pattern[dr[2],dr[1]-1:dr[3]+1],
+                            self.m_degradation[dr[2],dr[1]-1:dr[3]+1]) /
+                        self.m_pattern[dr[2],dr[1]-1:dr[3]+1].sum() )
+                moveE = ( random.random() <= probE )
+            elif moveW:
+                if dr[0] > 0:
+                    probW = (
+                        np.dot(self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1],
+                            self.m_degradation[dr[0]-1,dr[1]-1:dr[3]+1]) /
+                        self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1].sum() )
+                moveW = ( random.random() <= probW )
+            if moveN: dr += [ 0,+1, 0,+1]
+            if moveS: dr += [ 0,-1, 0,-1]
+            if moveE: dr += [+1, 0,+1, 0]
+            if moveW: dr += [-1, 0,-1, 0]
+
         # Update position
-        if self.b_degrade:
-            prob = np.mean(tmpFront)
-        else:
-            prob = 1
-        # Draw a sample from the bernolli distribution Bern(prob)
-        if random.random() <= prob:
-            # Random sample is True
-            self.droplet += tmpShift
-        else:
-            # Random sample is False
-            pass
+        # if self.b_degrade:
+        #     prob = np.mean(tmpFront)
+        # else:
+        #     prob = 1
+        # # Draw a sample from the bernolli distribution Bern(prob)
+        # if random.random() <= prob:
+        #     # Random sample is True
+        #     self.droplet += tmpShift
+        # else:
+        #     # Random sample is False
+        #     pass
+        
         return
         
         
