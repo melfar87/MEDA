@@ -226,17 +226,17 @@ class MEDAEnv(gym.Env):
         b_at_goal = 0
         if self._isComplete():
             reward = 1.0
-            b_at_goal = 1
+            b_at_goal = 100
             done = True
         elif self.step_count > self.max_step:
-            reward = -0.8
+            reward = -100
             done = True
         elif prev_dist > curr_dist:  # move toward the goal
-            reward = 0.5
+            reward = 0.5*(prev_dist-curr_dist)
         elif prev_dist == curr_dist:
             reward = -0.3
         else:  # move away the goal
-            reward = -0.8
+            reward = -0.8*(curr_dist-prev_dist)
         return obs, reward, done, {"b_at_goal":b_at_goal, "num_cycles":self.step_count}
 
 
@@ -256,6 +256,7 @@ class MEDAEnv(gym.Env):
             plt.axis('off')
             plt.draw()
             plt.pause(0.001)
+            plt.savefig('log/Render.png')
 
         elif mode=='rgb_array':
             pass
