@@ -23,7 +23,7 @@ import datetime
 
 def getTimeStamp():
     now = datetime.datetime.now()
-    return now.strftime('%Y%m%d-%H%M')
+    return now.strftime('%Y%m%d_%H%M')
 
 
 def legacyReward(env, b_path = False):
@@ -50,7 +50,7 @@ def EvaluatePolicy(model, env,
             action, state = model.predict(obs)
             obs, reward, done, _info = env.step(action)
             if render:
-                env.render()
+                env.envs[0].render()
                 # time.sleep(0.001)
             b_at_goal = _info[0]["b_at_goal"]
             # cycles = _info[0]["num_cycles"]
@@ -144,7 +144,7 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         model.learn(total_timesteps = n_steps)
         mean_reward, n_steps, legacy_reward, reach_goal, mean_cycle = \
             EvaluatePolicy(model, model.get_env(), n_eval_episodes = 100,
-                           b_path=b_path, render=True)
+                           b_path=b_path, render=False)
         agent_rewards.append(mean_reward)
         old_rewards.append(legacy_reward)
         episodes.append(i)
@@ -203,7 +203,7 @@ def expSeveralRuns(args):
         if b_save_model:
             model.save("data/model_%s" % getTimeStamp())
             
-    env_info = '_E' + str(n_epochs) + '_H'
+    env_info = '_E' + str(n_epochs) + '_I'
     plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, str_size, env_info)
     return
 
@@ -235,14 +235,14 @@ if __name__ == '__main__':
     # List of args default values
     def_args = {
         'verbose':  '1',
-        'size':     (15,10),
+        'size':     (60,60),
         'droplet_sizes': [[4,4],],
-        'n_envs':   1,
+        'n_envs':   8,
         'n_s':      64,
         'n_exps':   1,
         'n_epochs': 21,
         'n_steps': 20000,
-        'b_save_model': False,
+        'b_save_model': True,
         's_model_name': 'model',
         's_load_model': ''
     }
