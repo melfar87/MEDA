@@ -1,6 +1,6 @@
 from gym.envs.registration import register
 
 register(
-    id='dmfb-v0',
-    entry_point='dmfb_env.envs:DMFBEnv',
+    id='meda-v0',
+    entry_point='envs:MEDAEnv',
 )
