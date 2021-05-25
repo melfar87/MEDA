@@ -269,7 +269,7 @@ if __name__ == '__main__':
     import tensorflow as tf
     from utils import OldRouter
     from my_net import MyCnnPolicy
-    from envs.dmfb import *
+    # from envs.dmfb import *
     from envs.meda import *
     from stable_baselines.common import make_vec_env # tf_util
     # from stable_baselines.common.vec_env import DummyVecEnv

@@ -13,6 +13,11 @@ from gym import error, spaces, utils
 import cv2
 from gym.utils import seeding
 
+from pyglet.window import key
+import time
+
+import pygame
+
 
 class DirectionSimple(IntEnum):
     NN = 0  # North
@@ -22,52 +27,14 @@ class DirectionSimple(IntEnum):
     
 
 class Direction(IntEnum):
-    NN = 0  # North
-    EE = 1  # East
-    SS = 2  # South
-    WW = 3  # West
-    NE = 4  # N. East
-    NW = 5  # N. West
-    SE = 6  # S. East
-    SW = 7  # S. West
-
-
-
-class Module:
-    def __init__(self, x_min, x_max, y_min, y_max):
-        if x_min > x_max or y_min > y_max:
-            raise TypeError('Module() inputs are illegal')
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = y_min
-        self.y_max = y_max
-
-
-    def isPointInside(self, point):
-        ''' point is in the form of (y, x) '''
-        if point[0] >= self.y_min and point[0] <= self.y_max and \
-                point[1] >= self.x_min and point[1] <= self.x_max:
-            return True
-        else:
-            return False
-
-
-    def isModuleOverlap(self, m):
-        if self._isLinesOverlap(self.x_min, self.x_max, m.x_min, m.x_max) and \
-                self._isLinesOverlap(self.y_min, self.y_max, m.y_min, m.y_max):
-            return True
-        else:
-            return False
-
-
-    def _isLinesOverlap(self, xa_1, xa_2, xb_1, xb_2):
-        if xa_1 > xb_2:
-            return False
-        elif xb_1 > xa_2:
-            return False
-        else:
-            return True
-
+    NN = 1  # North
+    EE = 2  # East
+    SS = 3  # South
+    WW = 4  # West
+    NE = 5  # N. East
+    NW = 6  # N. West
+    SE = 7  # S. East
+    SW = 8  # S. West
 
 
 class MEDAEnv(gym.Env):
@@ -78,6 +45,7 @@ class MEDAEnv(gym.Env):
     def __init__(self, width=0, height=0, droplet_sizes=[[4,4],], n_bits=2,
                  b_degrade=True, per_degrade=0.1, b_use_dict=False,
                  b_unify_obs=True, b_parm_step=True,
+                 b_play_mode=False, delay_counter = 10,
                  **kwargs):
         """ Gym Constructor for MEDA
         :param height: Biochip height in microelectrodes
@@ -90,6 +58,9 @@ class MEDAEnv(gym.Env):
         """
         super(MEDAEnv, self).__init__()
         self.viewer = None
+        self.b_play_mode = b_play_mode
+        self.delay_counter = 0
+        self.def_delay_counter = delay_counter
         width, height = kwargs['size']
         self.reset_counter = 0
         # Instance variables
@@ -166,9 +137,25 @@ class MEDAEnv(gym.Env):
         self._updateHealth()
         # Update distance to goal
         self.m_distance = self._getDistanceToGoal()
-        
+        self.keys_to_action = {
+            (pygame.K_w, ): Direction.NN, (pygame.K_KP8, ): Direction.NN,
+            (pygame.K_x, ): Direction.SS, (pygame.K_KP2, ): Direction.SS,
+            (pygame.K_s, ): Direction.SS, (pygame.K_KP5, ): Direction.SS,
+            (pygame.K_d, ): Direction.EE, (pygame.K_KP6, ): Direction.EE,
+            (pygame.K_a, ): Direction.WW, (pygame.K_KP4, ): Direction.WW,
+            (pygame.K_e, ): Direction.NE, (pygame.K_KP9, ): Direction.NE,
+            (pygame.K_q, ): Direction.NW, (pygame.K_KP7, ): Direction.NW,
+            (pygame.K_c, ): Direction.SE, (pygame.K_KP3, ): Direction.SE,
+            (pygame.K_z, ): Direction.SW, (pygame.K_KP1, ): Direction.SW,
+        }
         return
 
+    # @property
+    # def spec(self):
+    #     return self.env.spec
+    
+    def get_keys_to_action(self):
+        return self.keys_to_action
 
     # Gym Interfaces
     def reset(self):
@@ -209,34 +196,55 @@ class MEDAEnv(gym.Env):
                 dictionary
                 )
         """
-        self.step_count += 1
-        # Update actuation pattern and compute new position
-        prev_dist = self._getDistanceToGoal()
-        self._updatePattern(action)
-        self.agt_sta = copy.deepcopy(self.droplet)
-        curr_dist = self._getDistanceToGoal()
-        # Update the global number of actuations
-        self.m_actuations_count += self.m_pattern
-        # Update biochop health
-        self._updateHealth()
-        # Update observation
-        obs = self._getObs()
-        # Compute rewards
-        done = False
-        b_at_goal = 0
-        if self._isComplete():
-            reward = 1.0
-            b_at_goal = 100
-            done = True
-        elif self.step_count > self.max_step:
-            reward = -100
-            done = True
-        elif prev_dist > curr_dist:  # move toward the goal
-            reward = 0.5*(prev_dist-curr_dist)
-        elif prev_dist == curr_dist:
-            reward = -0.3
-        else:  # move away the goal
-            reward = -0.8*(curr_dist-prev_dist)
+        if self.b_play_mode:
+            if self.delay_counter==0:
+                if action is not 0:
+                    # Accept action and start delay counter
+                    self.delay_counter = self.def_delay_counter
+            elif self.delay_counter > 0:
+                if action is not 0:
+                    # Reject action and keep counting down
+                    action = 0
+                else:
+                    # Action released, so stop counting down
+                    self.delay_counter = 0
+            else:
+                print("WTF")
+                
+        if action is not 0:
+            self.step_count += 1
+            # Update actuation pattern and compute new position
+            prev_dist = self._getDistanceToGoal()
+            self._updatePattern(action)
+            self.agt_sta = copy.deepcopy(self.droplet)
+            curr_dist = self._getDistanceToGoal()
+            # Update the global number of actuations
+            self.m_actuations_count += self.m_pattern
+            # Update biochop health
+            self._updateHealth()
+            # Update observation
+            obs = self._getObs()
+            # Compute rewards
+            done = False
+            b_at_goal = 0
+            if self._isComplete():
+                reward = 100.0
+                b_at_goal = 100
+                done = True
+            elif self.step_count > self.max_step:
+                reward = -100
+                done = True
+            elif prev_dist > curr_dist:  # move toward the goal
+                reward = 0.5*(prev_dist-curr_dist)
+            elif prev_dist == curr_dist:
+                reward = -0.3
+            else:  # move away the goal
+                reward = -0.8*(curr_dist-prev_dist)
+        else:
+            obs = self._getObs()
+            reward = 0
+            done = self._isComplete() or (self.step_count > self.max_step)
+            b_at_goal = 100 if done else 0
         return obs, reward, done, {"b_at_goal":b_at_goal, "num_cycles":self.step_count}
 
 
@@ -250,6 +258,7 @@ class MEDAEnv(gym.Env):
         #     from gym.envs.classic_control import rendering
         #     self.viewer = rendering.Viewer(screen_width, screen_height)
         
+        img = None
         if mode=='human':
             obs_full = self._getObs(full_res=True)
             plt.imshow(np.asarray(obs_full))
@@ -257,11 +266,15 @@ class MEDAEnv(gym.Env):
             plt.draw()
             plt.pause(0.001)
             plt.savefig('log/Render.png')
-
         elif mode=='rgb_array':
-            pass
+            frame = self._getFrame()
+            img = frame
+            # img = np.flip(obs_full[:,:,[3,1,2]],1)
+            # img = np.flip(frame,1)
         else:
-            return None
+            pass
+        
+        return img
         
         #return self.viewer.render(return_rgb_array=mode == 'rgb_array')
         
@@ -526,6 +539,34 @@ class MEDAEnv(gym.Env):
                 interpolation=cv2.INTER_AREA
             )
         return obs
+    
+    def _getFrame(self):
+        """
+        0: Obstacles,
+        1: Goal,
+        2: Droplet,
+        3: Health
+        """
+        # obs = np.zeros(shape=(self.height, self.width, self.n_layers))
+        # obs = self._addModulesInObs(obs)
+        frame = np.zeros(shape=(self.width, self.height, 3), dtype=np.float)
+        # Add degradation (gray)
+        frame[:,:,0] = self.m_degradation
+        frame[:,:,1] = self.m_degradation
+        frame[:,:,2] = self.m_degradation
+        # Add Goal (green)
+        x0,y0,x1,y1 = self.goal
+        frame[x0:x1,y0:y1,0] = 0
+        frame[x0:x1,y0:y1,1] = 1
+        frame[x0:x1,y0:y1,2] = 0
+        # Add Droplet (B)
+        x0,y0,x1,y1 = self.droplet
+        frame[x0:x1,y0:y1,0] = 0
+        frame[x0:x1,y0:y1,1] = 0
+        frame[x0:x1,y0:y1,2] = 1
+        # Correct orientation
+        frame = np.flip(frame,1)
+        return frame
     
     
     def _isComplete(self):
