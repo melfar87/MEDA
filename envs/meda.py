@@ -13,10 +13,10 @@ from gym import error, spaces, utils
 import cv2
 from gym.utils import seeding
 
-from pyglet.window import key
+# from pyglet.window import key
 import time
 
-import pygame
+# import pygame
 
 
 class DirectionSimple(IntEnum):
@@ -137,17 +137,24 @@ class MEDAEnv(gym.Env):
         self._updateHealth()
         # Update distance to goal
         self.m_distance = self._getDistanceToGoal()
-        self.keys_to_action = {
-            (pygame.K_w, ): Direction.NN, (pygame.K_KP8, ): Direction.NN,
-            (pygame.K_x, ): Direction.SS, (pygame.K_KP2, ): Direction.SS,
-            (pygame.K_s, ): Direction.SS, (pygame.K_KP5, ): Direction.SS,
-            (pygame.K_d, ): Direction.EE, (pygame.K_KP6, ): Direction.EE,
-            (pygame.K_a, ): Direction.WW, (pygame.K_KP4, ): Direction.WW,
-            (pygame.K_e, ): Direction.NE, (pygame.K_KP9, ): Direction.NE,
-            (pygame.K_q, ): Direction.NW, (pygame.K_KP7, ): Direction.NW,
-            (pygame.K_c, ): Direction.SE, (pygame.K_KP3, ): Direction.SE,
-            (pygame.K_z, ): Direction.SW, (pygame.K_KP1, ): Direction.SW,
-        }
+        try:
+            from pyglet.window import key
+            import pygame
+            self.keys_to_action = {
+                (pygame.K_w, ): Direction.NN, (pygame.K_KP8, ): Direction.NN,
+                (pygame.K_x, ): Direction.SS, (pygame.K_KP2, ): Direction.SS,
+                (pygame.K_s, ): Direction.SS, (pygame.K_KP5, ): Direction.SS,
+                (pygame.K_d, ): Direction.EE, (pygame.K_KP6, ): Direction.EE,
+                (pygame.K_a, ): Direction.WW, (pygame.K_KP4, ): Direction.WW,
+                (pygame.K_e, ): Direction.NE, (pygame.K_KP9, ): Direction.NE,
+                (pygame.K_q, ): Direction.NW, (pygame.K_KP7, ): Direction.NW,
+                (pygame.K_c, ): Direction.SE, (pygame.K_KP3, ): Direction.SE,
+                (pygame.K_z, ): Direction.SW, (pygame.K_KP1, ): Direction.SW,
+            }
+        except:
+            print("INFO: PYGLET failed to load")
+            self.keys_to_action = None
+            
         return
 
     # @property
