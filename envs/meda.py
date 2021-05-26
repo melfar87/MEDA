@@ -30,12 +30,12 @@ class Direction(IntEnum):
 
 class MEDAEnv(gym.Env):
     """ MEDA biochip environment, following gym interface """
-    metadata = {'render.modes': ['human', 'rgb_array'],
+    metadata = {'render.modes': ['human', 'human_frame', 'rgb_array'],
                 'video.frames_per_second': 2}
 
     def __init__(self, width=0, height=0, droplet_sizes=[[4,4],], n_bits=2,
                  b_degrade=True, per_degrade=0.1, b_use_dict=False,
-                 b_unify_obs=True, b_parm_step=True,
+                 b_unify_obs=True, b_parm_step=True, obs_size=(30, 30),
                  b_play_mode=False, delay_counter = 10,
                  **kwargs):
         """ Gym Constructor for MEDA
@@ -57,6 +57,7 @@ class MEDAEnv(gym.Env):
         self.delay_counter = 0
         self.def_delay_counter = delay_counter
         width, height = kwargs['size']
+        self.obs_size = obs_size
         self.reset_counter = 0
         # Instance variables
         self.height = height
@@ -104,11 +105,13 @@ class MEDAEnv(gym.Env):
             self.keys = list(self.observation_space.spaces.keys())
         else:
             # Layers: (
-                # 0: obstacles,
-                # 1: goal,
-                # 2: sensors,
-                # 3: health )
-            self.n_layers = 3 + 1
+                # 0: goal,
+                # 1: sensors (droplet),
+                # 2: health )
+            self.n_layers = 3
+            self.goal_layer_id = 0
+            self.droplet_layer_id = 1
+            self.health_layer_id = 2
             self.default_observation = np.zeros(
                 shape=(width, height, self.n_layers), dtype=np.float)
             if self.b_unify_obs:
@@ -122,7 +125,8 @@ class MEDAEnv(gym.Env):
                     low=0, high=1,
                     shape=(width, height, self.n_layers), dtype=np.float)
                 
-        self.reward_range = (-1.0, 1.0)
+        # Provide reward range since some algorithms may need it
+        self.reward_range = (-100.0, 1.0)
         
         # Reset actuations matrix
         self._resetActuationMatrix()
@@ -133,7 +137,7 @@ class MEDAEnv(gym.Env):
         # Update distance to goal
         self.m_distance = self._getDistanceToGoal()
         try:
-            from pyglet.window import key
+            # from pyglet.window import key
             import pygame
             self.keys_to_action = {
                 (pygame.K_w, ): Direction.NN, (pygame.K_KP8, ): Direction.NN,
@@ -268,11 +272,16 @@ class MEDAEnv(gym.Env):
             plt.draw()
             plt.pause(0.001)
             plt.savefig('log/Render.png')
+        elif mode=='human_frame':
+            frame = self._getFrame()
+            plt.imshow(np.asarray(frame))
+            plt.axis('off')
+            plt.draw()
+            plt.pause(0.001)
+            plt.savefig('log/Render.png')
         elif mode=='rgb_array':
             frame = self._getFrame()
             img = frame
-            # img = np.flip(obs_full[:,:,[3,1,2]],1)
-            # img = np.flip(frame,1)
         else:
             pass
         
@@ -477,39 +486,24 @@ class MEDAEnv(gym.Env):
     
     
     def _getObs(self, full_res=False):
-        """
-        0: Obstacles,
-        1: Goal,
-        2: Droplet,
-        3: Health
-        """
         # obs = np.zeros(shape=(self.height, self.width, self.n_layers))
         # obs = self._addModulesInObs(obs)
         obs = np.zeros_like(self.default_observation)
         # Goal layer
         x0,y0,x1,y1 = self.goal
         # obs[y0:y1+1,x0:x1+1,1] = 1
-        obs[x0:x1,y0:y1,1] = 1
+        obs[x0:x1,y0:y1,self.goal_layer_id] = 1
         # Droplet layer
         x0,y0,x1,y1 = self.droplet
         # obs[y0:y1+1,x0:x1+1,2] = 1
-        obs[x0:x1,y0:y1,2] = 1
+        obs[x0:x1,y0:y1,self.droplet_layer_id] = 1
         # Health layer
-        obs[:,:,3] = self.m_health
+        obs[:,:,self.health_layer_id] = self.m_health
         if self.b_unify_obs and not full_res:
-            obs = cv2.resize(
-                obs, (30, 30),
-                interpolation=cv2.INTER_AREA
-            )
+            obs = cv2.resize(obs, self.obs_size, interpolation=cv2.INTER_AREA)
         return obs
     
     def _getFrame(self):
-        """
-        0: Obstacles,
-        1: Goal,
-        2: Droplet,
-        3: Health
-        """
         # obs = np.zeros(shape=(self.height, self.width, self.n_layers))
         # obs = self._addModulesInObs(obs)
         frame = np.zeros(shape=(self.width, self.height, 3), dtype=np.float)
