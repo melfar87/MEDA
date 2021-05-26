@@ -5,21 +5,6 @@ import os
 import time
 import datetime
 
-# import matplotlib
-# import matplotlib.pyplot as plt
-# import tensorflow as tf
-
-# from utils import OldRouter
-# from my_net import MyCnnPolicy
-# from envs.dmfb import *
-# from envs.meda import *
-
-# from stable_baselines.common import make_vec_env, tf_util
-# from stable_baselines.common.vec_env import DummyVecEnv
-# from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
-# from stable_baselines.common.evaluation import evaluate_policy
-# from stable_baselines import PPO2
-
 
 def getTimeStamp():
     now = datetime.datetime.now()
@@ -234,9 +219,10 @@ if __name__ == '__main__':
     
     # List of args default values
     def_args = {
+        'seed': 123,
         'verbose':  '1',
         'size':     (60,60),
-        'droplet_sizes': [[4,4],],
+        'droplet_sizes': [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':   8,
         'n_s':      64,
         'n_exps':   1,
@@ -249,6 +235,7 @@ if __name__ == '__main__':
     
     # Initialize parser
     parser = argparse.ArgumentParser(description='MEDA Training Module')
+    parser.add_argument('--seed',type=int,default=def_args['seed'])
     parser.add_argument('-v','--verbose',type=str,default=def_args['verbose'])
     parser.add_argument('-s','--size',type=tuple,default=def_args['size'])
     parser.add_argument('--droplet-sizes',type=list,default=def_args['droplet_sizes'])
@@ -260,6 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--b-save-model',type=bool,default=def_args['b_save_model'])
     parser.add_argument('--s-model-name',type=str,default=def_args['s_model_name'])
     parser.add_argument('--s-load-model',type=str,default=def_args['s_load_model'])
+    
     args = parser.parse_args()
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
@@ -276,5 +264,10 @@ if __name__ == '__main__':
     # from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
     # from stable_baselines.common.evaluation import evaluate_policy
     from stable_baselines import PPO2
+    
+    # Set random seeds before starting for SB, Random, tensorflow, numpy, gym
+    if args.seed >= 0:
+        from stable_baselines.common.misc_util import set_global_seeds
+        set_global_seeds(args.seed)
     
     main(args)
