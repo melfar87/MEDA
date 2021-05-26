@@ -222,6 +222,7 @@ if __name__ == '__main__':
         'seed': 123,
         'verbose':  '1',
         'size':     (60,60),
+        'obs_size': (30,30),
         'droplet_sizes': [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':   8,
         'n_s':      64,
@@ -237,8 +238,9 @@ if __name__ == '__main__':
     # Initialize parser
     parser = argparse.ArgumentParser(description='MEDA Training Module')
     parser.add_argument('--seed',type=int,default=def_args['seed'])
-    parser.add_argument('-v','--verbose',type=str,default=def_args['verbose'])
-    parser.add_argument('-s','--size',type=tuple,default=def_args['size'])
+    parser.add_argument('--verbose',type=str,default=def_args['verbose'])
+    parser.add_argument('--size',type=tuple,default=def_args['size'])
+    parser.add_argument('--obs-size',type=tuple,default=def_args['obs_size'])
     parser.add_argument('--droplet-sizes',type=list,default=def_args['droplet_sizes'])
     parser.add_argument('--n-envs',type=int,default=def_args['n_envs'])
     parser.add_argument('--n-s',type=int,default=def_args['n_s'])
