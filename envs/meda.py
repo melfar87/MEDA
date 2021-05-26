@@ -1,9 +1,6 @@
 import copy
-import math
-import queue
 import random
 import numpy as np
-from PIL import Image
 from enum import IntEnum
 import matplotlib.pyplot as plt
 
@@ -11,12 +8,6 @@ import gym
 from gym import error, spaces, utils
 # from gym.wrappers import ResizeObservation
 import cv2
-from gym.utils import seeding
-
-# from pyglet.window import key
-import time
-
-# import pygame
 
 
 class DirectionSimple(IntEnum):
@@ -58,7 +49,11 @@ class MEDAEnv(gym.Env):
         """
         super(MEDAEnv, self).__init__()
         self.viewer = None
-        self.b_play_mode = b_play_mode
+        try:
+            self.b_play_mode = kwargs['b_play_mode']
+        except:
+            self.b_play_mode = b_play_mode
+        print("INFO: Play mode is %s" % ("ENABLED" if self.b_play_mode else "DISABLED"))
         self.delay_counter = 0
         self.def_delay_counter = delay_counter
         width, height = kwargs['size']
@@ -283,47 +278,6 @@ class MEDAEnv(gym.Env):
         
         return img
         
-        #return self.viewer.render(return_rgb_array=mode == 'rgb_array')
-        
-        # goal:2, pos:1, blocks:-1, degrade: -2
-        # if mode == 'human':
-        #     img = np.zeros(shape= \
-        #                        (self.height, self.width))
-        #     img[self.goal[0]][self.goal[1]] = 2
-        #     img[self.droplet[0]][self.droplet[1]] = 1
-        #     for m in self.modules:
-        #         for y in range(m.y_min, m.y_max + 1):
-        #             for x in range(
-        #                     m.x_min, m.x_max + 1):
-        #                 img[y][x] = -1
-        #     if self.b_degrade:
-        #         img[self.m_health < 0.5] = -2
-        #     return img
-        # elif mode == 'rgb_array':
-        #     img = self._getObs().astype(np.uint8)
-        #     for y in range(self.height):
-        #         for x in range(self.width):
-        #             if np.array_equal(img[y][x], [1, 0, 0]):  # red
-        #                 img[y][x] = [255, 0, 0]
-        #             elif np.array_equal(img[y][x], [0, 1, 0]):  # gre
-        #                 img[y][x] = [0, 255, 0]
-        #             elif np.array_equal(img[y][x], [0, 0, 1]):  # blu
-        #                 img[y][x] = [0, 0, 255]
-        #             elif self.b_degrade and \
-        #                     self.m_health[y][x] < 0.5:  # ppl
-        #                 img[y][x] = [255, 102, 255]
-        #             elif self.b_degrade and \
-        #                     self.m_health[y][x] < 0.7:  # ppl
-        #                 img[y][x] = [255, 153, 255]
-        #             else:  # grey
-        #                 img[y][x] = [192, 192, 192]
-        #     return img
-        # else:
-        #     raise RuntimeError(
-        #         'Unknown mode in render')
-        
-        return
-
 
     def close(self):
         """close render view
@@ -349,10 +303,11 @@ class MEDAEnv(gym.Env):
         """Returns droplet start and goal locations. Gets called upon
         initialization and reset.
         """
-        # [TODO] Implement random dr_0 and dr_g generator based on size
-        # Select droplet size first
-        dr_width = self.droplet_sizes[0][0]
-        dr_height = self.droplet_sizes[0][1]
+        # [DONE] Implement random dr_0 and dr_g generator based on size
+        # Randomly select droplet size first
+        dr_width, dr_height = random.choice(self.droplet_sizes)
+        # dr_width = self.droplet_sizes[0][0]
+        # dr_height = self.droplet_sizes[0][1]
         # Randomly generate initial state
         # self.droplet = np.array((3,2,6,5))
         xs0 = random.choice(self.xs0range)
@@ -378,6 +333,7 @@ class MEDAEnv(gym.Env):
         """Resets actuation matrix
         """
         if is_random:
+            self.m_actuations_count = random.randint(0,1000)
             self.m_actuations_count = np.random.randint(
                 0,2000,(self.width, self.height)
             )
