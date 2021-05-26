@@ -230,7 +230,8 @@ if __name__ == '__main__':
         'n_steps': 20000,
         'b_save_model': True,
         's_model_name': 'model',
-        's_load_model': ''
+        's_load_model': '',
+        'b_play_mode': False
     }
     
     # Initialize parser
@@ -247,6 +248,7 @@ if __name__ == '__main__':
     parser.add_argument('--b-save-model',type=bool,default=def_args['b_save_model'])
     parser.add_argument('--s-model-name',type=str,default=def_args['s_model_name'])
     parser.add_argument('--s-load-model',type=str,default=def_args['s_load_model'])
+    parser.add_argument('--b-play-mode',type=bool,default=def_args['b_play_mode'])
     
     args = parser.parse_args()
     

@@ -23,7 +23,6 @@ def testEnvironment(env, args):
 
 
 def main(args):
-    
     t0s = time.time()
     vec_env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=1,env_kwargs=vars(args))
     env = vec_env.envs[0]
@@ -37,9 +36,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-    
+        
     # List of args default values
     def_args = {
+        'seed': 123,
         'verbose':  '1',
         'size':     (60,60),
         'droplet_sizes': [[4,4],],
@@ -50,11 +50,13 @@ if __name__ == '__main__':
         'n_steps': 20000,
         'b_save_model': True,
         's_model_name': 'model',
-        's_load_model': ''
+        's_load_model': '',
+        'b_play_mode': True
     }
     
     # Initialize parser
     parser = argparse.ArgumentParser(description='MEDA Training Module')
+    parser.add_argument('--seed',type=int,default=def_args['seed'])
     parser.add_argument('-v','--verbose',type=str,default=def_args['verbose'])
     parser.add_argument('-s','--size',type=tuple,default=def_args['size'])
     parser.add_argument('--droplet-sizes',type=list,default=def_args['droplet_sizes'])
@@ -66,6 +68,8 @@ if __name__ == '__main__':
     parser.add_argument('--b-save-model',type=bool,default=def_args['b_save_model'])
     parser.add_argument('--s-model-name',type=str,default=def_args['s_model_name'])
     parser.add_argument('--s-load-model',type=str,default=def_args['s_load_model'])
+    parser.add_argument('--b-play-mode',type=bool,default=def_args['b_play_mode'])
+
     args = parser.parse_args()
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
@@ -82,5 +86,9 @@ if __name__ == '__main__':
     # from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
     # from stable_baselines.common.evaluation import evaluate_policy
     # from stable_baselines import PPO2
+    
+    if args.seed >= 0:
+        from stable_baselines.common.misc_util import set_global_seeds
+        set_global_seeds(args.seed)
     
     main(args)
