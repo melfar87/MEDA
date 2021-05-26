@@ -1,4 +1,38 @@
-MEDA:
-    ☐ Update default degradation behavior
-        ☐ Set default tau to 0.7
-        ☐ Set default c1, c2
+'Cmd/Ctrl+Enter' // Triggers `Todo: Toggle Box`
+'Alt+Enter' // Triggers `Todo: Toggle Box`
+'Alt+D' // Triggers `Todo: Toggle Done`
+'Alt+C' // Triggers `Todo: Toggle Cancelled`
+'Alt+S' // Triggers `Todo: Toggle Start`
+'Cmd/Ctrl+Shift+A' // Triggers  `Todo: Archive`
+
+MEDA.PaperWriting:
+    ☐ Update model action space
+
+MEDA.Coding:
+    `Must finish this first and foremost!`
+    ☐ @critical @today Finish major changes before pilot testing @started(21-05-25 21:59)
+        ✔ Randomize droplet size @started(21-05-25 20:13) @done(21-05-25 21:55) @lasted(1h42m35s)
+        ✔ Apply padding using the hazard zone @started(21-05-25 21:56) @done(21-05-26 00:03) @lasted(2h7m3s)
+            ✔ Remove the extra layer from observation @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m40s)
+            ✔ Modify observation in _getObs() @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m22s)
+            ✔ Modify observation in _getFrame() @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m27s)
+            ☐ Pad observation
+        ☐ Update the reward structure accordingly
+    ☐ @today Create a logging system for everything worth logging
+        ☐ Make a list of things to log
+        ☐ Quick search how to implement
+        ☐ Implement
+    ✔ @today Implement random seed @done(21-05-25 21:37)
+        ✔ Unify random everywhere @done(21-05-25 21:37)
+        ✔ Add random seed options to args @done(21-05-25 21:37)
+    
+MEDA.Experiments:
+    ☐ Pilot testing
+        ☐ Test model after applying all randomizations
+        ☐ Try profiling MEDA module and fix inefficient code
+
+MEDA.META:
+
+
+
+

@@ -1,4 +1,61 @@
+# import stable_baselines
 
+# import matplotlib
+# import matplotlib.pyplot as plt
+# import tensorflow as tf
+
+# from utils import OldRouter
+# from my_net import MyCnnPolicy
+# from envs.dmfb import *
+# from envs.meda import *
+
+# from stable_baselines.common import make_vec_env, tf_util
+# from stable_baselines.common.vec_env import DummyVecEnv
+# from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
+# from stable_baselines.common.evaluation import evaluate_policy
+# from stable_baselines import PPO2
+
+class SomeModule:
+    
+        #return self.viewer.render(return_rgb_array=mode == 'rgb_array')
+    
+    # goal:2, pos:1, blocks:-1, degrade: -2
+    # if mode == 'human':
+    #     img = np.zeros(shape= \
+    #                        (self.height, self.width))
+    #     img[self.goal[0]][self.goal[1]] = 2
+    #     img[self.droplet[0]][self.droplet[1]] = 1
+    #     for m in self.modules:
+    #         for y in range(m.y_min, m.y_max + 1):
+    #             for x in range(
+    #                     m.x_min, m.x_max + 1):
+    #                 img[y][x] = -1
+    #     if self.b_degrade:
+    #         img[self.m_health < 0.5] = -2
+    #     return img
+    # elif mode == 'rgb_array':
+    #     img = self._getObs().astype(np.uint8)
+    #     for y in range(self.height):
+    #         for x in range(self.width):
+    #             if np.array_equal(img[y][x], [1, 0, 0]):  # red
+    #                 img[y][x] = [255, 0, 0]
+    #             elif np.array_equal(img[y][x], [0, 1, 0]):  # gre
+    #                 img[y][x] = [0, 255, 0]
+    #             elif np.array_equal(img[y][x], [0, 0, 1]):  # blu
+    #                 img[y][x] = [0, 0, 255]
+    #             elif self.b_degrade and \
+    #                     self.m_health[y][x] < 0.5:  # ppl
+    #                 img[y][x] = [255, 102, 255]
+    #             elif self.b_degrade and \
+    #                     self.m_health[y][x] < 0.7:  # ppl
+    #                 img[y][x] = [255, 153, 255]
+    #             else:  # grey
+    #                 img[y][x] = [192, 192, 192]
+    #     return img
+    # else:
+    #     raise RuntimeError(
+    #         'Unknown mode in render')
+        
 
     def printHealthSatus(self):
         print('### Env Health ###')
@@ -52,11 +109,7 @@
             (p[0], p[1] + 1)]
         return [n for n in neighbors if self._isPointInside(n)]
     
-    
-    
-    
-    
-    
+
 #!/usr/bin/python
 
 import queue
