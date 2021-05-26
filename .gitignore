@@ -3,3 +3,4 @@
 /MEDA_env
 __pycache__/
 *.code-workspace
+log/
