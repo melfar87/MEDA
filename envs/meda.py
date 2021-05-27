@@ -84,7 +84,7 @@ class MEDAEnv(gym.Env):
         # Number of steps 
         self.step_count = 0
         # Maximum number of steps
-        self.max_step = 2 * (height + width)
+        self.max_step = 0 # 2 * (height + width)
         # List of droplet sizes
         self.droplet_sizes = droplet_sizes
         # Droplet range
@@ -130,8 +130,11 @@ class MEDAEnv(gym.Env):
         
         # Reset actuations matrix
         self._resetActuationMatrix()
-        # Get new start and goal locations and reset initial state
-        self._resetInitialState()
+        # Initialize droplet/goal/hazard locations and reset initial state
+        # self._resetInitialState()
+        self.droplet = np.zeros(4, dtype=np.int)
+        self.goal = np.zeros(4, dtype=np.int)
+        self.hazard = np.zeros(4, dtype=np.int)
         # Update health
         self._updateHealth()
         # Update distance to goal
@@ -299,6 +302,7 @@ class MEDAEnv(gym.Env):
 
 
     # Private functions
+    # [TODO][Cleaning] Remove _getCenter
     def _getCenter(self, dr):
         return ( (dr[0]+dr[2])/2.0 , (dr[1]+dr[3])/2.0 )
     
@@ -315,25 +319,32 @@ class MEDAEnv(gym.Env):
         # [DONE] Implement random dr_0 and dr_g generator based on size
         # Randomly select droplet size first
         dr_width, dr_height = random.choice(self.droplet_sizes)
-        # dr_width = self.droplet_sizes[0][0]
-        # dr_height = self.droplet_sizes[0][1]
-        # Randomly generate initial state
-        # self.droplet = np.array((3,2,6,5))
         xs0 = random.choice(self.xs0range)
         ys0 = random.choice(self.ys0range)
-        # [TODO] Check whether droplet range is closed or half open
+        # Droplet range includes mins and excludes maxs
         xs1 = xs0 + dr_width
         ys1 = ys0 + dr_height
         self.droplet = np.array((xs0,ys0,xs1,ys1))
         
         # Randomly generate goal state
-        # self.goal = np.array((self.width-4-3,self.height-3-3,self.width-4,self.height-3))
         xg0 = random.randint(1,self.width-dr_width)
         yg0 = random.randint(1,np.min((xg0,self.height-dr_height)))
         xg1 = xg0 + dr_width
         yg1 = yg0 + dr_height
-        self.goal = np.array((xg0,yg0,xg1,yg1))
+        self.goal[:] = (xg0,yg0,xg1,yg1)
         
+        # Compute hazard bounds
+        self.hazard[:] = (
+            max(min(self.goal[0],self.droplet[0])-3,0),
+            max(min(self.goal[1],self.droplet[1])-3,0),
+            min(max(self.goal[2],self.droplet[2])+3,self.width),
+            min(max(self.goal[3],self.droplet[3])+3,self.height)
+        )
+        
+        # Set the max number of steps allowed
+        self.max_step = 2*(self.hazard[2]-self.hazard[0])*(self.hazard[3]-self.hazard[1])
+        
+        # [TODO] Remove agt_sta and disable old router
         self.agt_sta = copy.deepcopy(self.droplet)
         return
     
@@ -354,36 +365,37 @@ class MEDAEnv(gym.Env):
     def _updatePattern(self, action):
         """Update actuation pattern
         """
+        x_min,y_min,x_max,y_max = self.hazard
         x0,y0,x1,y1 = self.droplet
         # Flags that indicate whether to check movement in a given direction:
         moveN, moveS, moveE, moveW = False, False, False, False
         # Find the shift in position
-        if   action == Direction.NN and y1 < self.height:
+        if   action == Direction.NN and y1 < y_max:
             tmpShift = [ 0,+1, 0,+1]
             tmpFront = self.m_degradation[x0:x1,y1]
             moveN = True
-        elif action == Direction.SS and y0 > 0:
+        elif action == Direction.SS and y0 > y_min:
             tmpShift = [ 0,-1, 0,-1]
             tmpFront = self.m_degradation[x0:x1,y0-1]
             moveS = True
-        elif action == Direction.EE and x1 < self.width:
+        elif action == Direction.EE and x1 < x_max:
             tmpShift = [+1, 0,+1, 0]
             tmpFront = self.m_degradation[x1,y0:y1]
             moveE = True
-        elif action == Direction.WW and x0 > 0:
+        elif action == Direction.WW and x0 > x_min:
             tmpShift = [-1, 0,-1, 0]
             tmpFront = self.m_degradation[x0-1,y0:y1]
             moveW = True
-        elif action == Direction.NE and y1 < self.height and x1 < self.width:
+        elif action == Direction.NE and y1 < y_max and x1 < x_max:
             tmpShift = [+1,+1,+1,+1]
             moveN, moveE = True, True
-        elif action == Direction.NW and y1 < self.height and x0 > 0:
+        elif action == Direction.NW and y1 < y_max and x0 > x_min:
             tmpShift = [-1,+1,-1,+1]
             moveN, moveW = True, True
-        elif action == Direction.SE and y0 > 0 and x1 < self.width:
+        elif action == Direction.SE and y0 > y_min and x1 < x_max:
             tmpShift = [+1,-1,+1,-1]
             moveS, moveE = True, True
-        elif action == Direction.SW and y0 > 0 and x0 > 0:
+        elif action == Direction.SW and y0 > y_min and x0 > x_min:
             tmpShift = [-1,-1,-1,-1]
             moveS, moveW = True, True
         else:
@@ -407,12 +419,12 @@ class MEDAEnv(gym.Env):
             tmpDr = self.droplet + tmpShift # New droplet location
         # self.m_prev_pattern = np.copy(self.m_pattern)
         # Correct tmpDr if needed
-        if   tmpDr[0] < 0:           tmpDr[[0,2]] -= tmpDr[[0,0]]
-        elif tmpDr[2] > self.width:  tmpDr[[0,2]] -= tmpDr[[2,2]] - self.width
-        if   tmpDr[1] < 0:           tmpDr[[1,3]] -= tmpDr[[1,1]]
-        elif tmpDr[3] > self.height: tmpDr[[1,3]] -= tmpDr[[3,3]] - self.height
-        # Reset pattern
-        self.m_pattern[:,:] = 0
+        if   tmpDr[0] < x_min: tmpDr[[0,2]] -= x_min - tmpDr[[0,0]]
+        elif tmpDr[2] > x_max: tmpDr[[0,2]] -= tmpDr[[2,2]] - x_max
+        if   tmpDr[1] < y_min: tmpDr[[1,3]] -= y_min - tmpDr[[1,1]]
+        elif tmpDr[3] > y_max: tmpDr[[1,3]] -= tmpDr[[3,3]] - y_max
+        # Reset pattern, np.array.fill is faster than [:,:] = 0
+        self.m_pattern.fill(0)
         # Note: if tmpDr range is beyond m_pattern, the outskirts are ignored
         self.m_pattern[tmpDr[0]:tmpDr[2],tmpDr[1]:tmpDr[3]] = 1 # New pattern
         
@@ -422,28 +434,28 @@ class MEDAEnv(gym.Env):
             # x0,y0,x1,y1 = self.droplet
             probN, probS, probE, probW = 0, 0, 0, 0
             if moveN:
-                if dr[3] < self.height:
+                if dr[3] < y_max:
                     probN = (
                         np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[3]],
                             self.m_degradation[dr[0]-1:dr[2]+1,dr[3]]) /
                         self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum() )
                 moveN = ( random.random() <= probN )
             elif moveS:
-                if dr[1] > 0:
+                if dr[1] > y_min:
                     probS = (
                         np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1],
                             self.m_degradation[dr[0]-1:dr[2]+1,dr[1]-1]) /
                         self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1].sum() )
                 moveS = ( random.random() <= probS )
             if moveE:
-                if dr[2] < self.width:
+                if dr[2] < x_max:
                     probE = (
                         np.dot(self.m_pattern[dr[2],dr[1]-1:dr[3]+1],
                             self.m_degradation[dr[2],dr[1]-1:dr[3]+1]) /
                         self.m_pattern[dr[2],dr[1]-1:dr[3]+1].sum() )
                 moveE = ( random.random() <= probE )
             elif moveW:
-                if dr[0] > 0:
+                if dr[0] > x_min:
                     probW = (
                         np.dot(self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1],
                             self.m_degradation[dr[0]-1,dr[1]-1:dr[3]+1]) /
@@ -491,21 +503,20 @@ class MEDAEnv(gym.Env):
         obs = np.zeros_like(self.default_observation)
         # Goal layer
         x0,y0,x1,y1 = self.goal
-        # obs[y0:y1+1,x0:x1+1,1] = 1
         obs[x0:x1,y0:y1,self.goal_layer_id] = 1
         # Droplet layer
         x0,y0,x1,y1 = self.droplet
-        # obs[y0:y1+1,x0:x1+1,2] = 1
         obs[x0:x1,y0:y1,self.droplet_layer_id] = 1
-        # Health layer
-        obs[:,:,self.health_layer_id] = self.m_health
+        # Health layer, this leaves health values outside hazard bounds as 0s
+        x0,y0,x1,y1 = self.hazard
+        obs[x0:x1,y0:y1,self.health_layer_id] = self.m_health[x0:x1,y0:y1]
+        # Resize obs if needed
         if self.b_unify_obs and not full_res:
             obs = cv2.resize(obs, self.obs_size, interpolation=cv2.INTER_AREA)
         return obs
     
+    
     def _getFrame(self):
-        # obs = np.zeros(shape=(self.height, self.width, self.n_layers))
-        # obs = self._addModulesInObs(obs)
         frame = np.zeros(shape=(self.width, self.height, 3), dtype=np.float)
         # Add degradation (gray)
         frame[:,:,0] = self.m_degradation
