@@ -21,43 +21,45 @@ def legacyReward(env, b_path = False):
 
 def EvaluatePolicy(model, env,
         n_eval_episodes = 100, b_path = False, render=False):
-    episode_rewards = []
-    legacy_rewards = []
-    reached_goal = []
-    num_cycles = []
-    n_steps = 0
-    for i in range(n_eval_episodes):
-        obs = env.reset()
-        done, state = False, None
-        episode_reward = 0.0
-        this_loop_steps = 0
-        while not done:
-            action, state = model.predict(obs)
-            obs, reward, done, _info = env.step(action)
-            if render:
-                env.envs[0].render()
-                # time.sleep(0.001)
-            b_at_goal = _info[0]["b_at_goal"]
-            # cycles = _info[0]["num_cycles"]
-            reward = reward[0]
-            done = done[0]
-            episode_reward += reward
-            n_steps += 1
-            this_loop_steps += 1
-            legacy_r = legacyReward(env.envs[0], b_path)
-        if b_path:
-            episode_rewards.append(this_loop_steps)
-        else:
-            episode_rewards.append(episode_reward)
-        legacy_rewards.append(legacy_r)
-        reached_goal.append(b_at_goal)
-        num_cycles.append(this_loop_steps)
-        # num_cycles.append(cycles)
-    mean_reward = np.mean(episode_rewards)
-    mean_legacy = np.mean(legacy_rewards)
-    mean_goal   = np.mean(reached_goal)
-    mean_cycles = np.mean(num_cycles)
-    return mean_reward, n_steps, mean_legacy, mean_goal, mean_cycles
+    t_eval_s = time.time()
+    episode_rewards = np.zeros(n_eval_episodes)
+    legacy_rewards = np.zeros(n_eval_episodes)
+    reached_goal = np.zeros(n_eval_episodes)
+    num_cycles = np.zeros(n_eval_episodes)
+    # n_steps = 0
+    # This takes advantage of the parallel environments
+    # n_eval_episodes = n_eval_episodes // env.num_envs + 1
+    obs = env.reset()
+    episode_reward = np.zeros(env.num_envs)
+    episode_count = 0
+    while (episode_count < n_eval_episodes):
+        # Make predictions and take action on all envs
+        action, state = model.predict(obs)
+        obs, reward, done, _info = env.step(action)
+        episode_reward += reward
+        # [TODO] Implement render option for vectorized environments
+        # if render:
+        #     env.envs[0].render()
+        #     # time.sleep(0.001)
+        for env_id in range(env.num_envs):
+            if done[env_id]:
+                # If environment is done, create a record
+                episode_rewards[episode_count] = episode_reward[env_id]
+                reached_goal[episode_count] = _info[env_id]["b_at_goal"]
+                num_cycles[episode_count] = _info[env_id]["num_cycles"]
+                # Reset respective environment
+                episode_reward[env_id] = 0
+                # Increment no. of episodes, break if no more episodes are needed
+                episode_count+=1
+                if episode_count >= n_eval_episodes: break
+    # Compute the mean values
+    mean_reward = episode_rewards.mean()
+    mean_legacy = legacy_rewards.mean()
+    mean_goal   = reached_goal.mean()
+    mean_cycles = num_cycles.mean()
+    t_eval_e = time.time()
+    print("      Eval took %d seconds" % (t_eval_e-t_eval_s))
+    return mean_reward, mean_legacy, mean_goal, mean_cycles
 
 
 def showIsGPU():
@@ -72,11 +74,11 @@ def plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, size,
     a_rewards = np.array(a_rewards)
     a_goals = np.array(a_goals)
     a_cycles = np.array(a_cycles)
-    o_rewards = np.array(o_rewards)
+    # o_rewards = np.array(o_rewards)
     a_line = np.average(a_rewards, axis = 0)
     a_goals_line = np.average(a_goals, axis = 0)
     a_cycles_line = np.average(a_cycles, axis = 0)
-    o_line = np.average(o_rewards, axis = 0)
+    # o_line = np.average(o_rewards, axis = 0)
     a_max = np.max(a_rewards, axis = 0)
     a_min = np.min(a_rewards, axis = 0)
     o_max = np.max(o_rewards, axis = 0)
@@ -91,7 +93,7 @@ def plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, size,
         plt.plot(episodes, a_line, 'r-', label = 'Agent')
         plt.plot(episodes, a_goals_line, 'g.', label = 'Success Rate')
         plt.plot(episodes, a_cycles_line, 'k-.', label = 'No. Cycles')
-        plt.plot(episodes, o_line, 'b-', label = 'Baseline')
+        # plt.plot(episodes, o_line, 'b-', label = 'Baseline')
         if b_path:
             leg = plt.legend(loc = 'upper left', shadow = True, fancybox = True)
         else:
@@ -127,11 +129,11 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         t2s = time.time()
         print("INFO: Epoch %2d started" % i)
         model.learn(total_timesteps = n_steps)
-        mean_reward, n_steps, legacy_reward, reach_goal, mean_cycle = \
+        mean_reward, legacy_reward, reach_goal, mean_cycle = \
             EvaluatePolicy(model, model.get_env(), n_eval_episodes = 100,
                            b_path=b_path, render=False)
         agent_rewards.append(mean_reward)
-        old_rewards.append(legacy_reward)
+        # old_rewards.append(legacy_reward)
         episodes.append(i)
         t2e = time.time()
         episode_times.append(t2e-t2s)
@@ -139,7 +141,7 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         mean_cycles.append(mean_cycle)
         print("INFO: Epoch %2d ended in %d seconds" % (i,t2e-t2s))
     agent_rewards = agent_rewards[-n_epochs:]
-    old_rewards = old_rewards[-n_epochs:]
+    # old_rewards = old_rewards[-n_epochs:]
     episodes = episodes[:n_epochs]
     return agent_rewards, old_rewards, episodes, reach_goals, mean_cycles, model
 
@@ -175,6 +177,7 @@ def expSeveralRuns(args):
     else:
         loaded_model = None
         
+    env_info = '_E' + str(n_epochs) + '_X'
     # Run Experiments
     for i in range(n_experiments):
         a_r, o_r, episodes, a_g, a_c, model = runAnExperiment(
@@ -186,9 +189,9 @@ def expSeveralRuns(args):
         o_rewards.append(o_r)
         a_cycles.append(a_c)
         if b_save_model:
-            model.save("data/model_%s" % getTimeStamp())
+            # model.save("data/model_%s" % getTimeStamp())
+            model.save("data/model_%s" % env_info)
             
-    env_info = '_E' + str(n_epochs) + '_I'
     plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, str_size, env_info)
     return
 
@@ -221,13 +224,13 @@ if __name__ == '__main__':
     def_args = {
         'seed': 123,
         'verbose':  '1',
-        'size':     (60,60),
+        'size':     (30,30),
         'obs_size': (30,30),
         'droplet_sizes': [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':   8,
         'n_s':      64,
         'n_exps':   1,
-        'n_epochs': 21,
+        'n_epochs': 201,
         'n_steps': 20000,
         'b_save_model': True,
         's_model_name': 'model',
