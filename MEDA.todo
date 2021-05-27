@@ -16,15 +16,29 @@ MEDA.Coding:
             ✔ Remove the extra layer from observation @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m40s)
             ✔ Modify observation in _getObs() @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m22s)
             ✔ Modify observation in _getFrame() @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m27s)
-            ☐ Pad observation
+            ✔ Pad observation @started(21-05-26 09:00) @done(21-05-26 15:15) @lasted(1d15m16s)
+                You can either (a) override actions, (b) set degradation to 0
+                I choose to merge both options by the following 
+                    ✔ Create hazard limits @started(21-05-26 09:00) @done(21-05-26 09:33) @lasted(33m23s)
+                    ✔ Update HL and step_max @started(21-05-26 09:30) @done(21-05-26 10:39) @lasted(1h9m50s)
+                    ✔ Update observation @started(21-05-26 10:52) @done(21-05-26 10:59) @lasted(7m20s)
+                    ✔ Use HL for actions @started(21-05-26 10:39) @done(21-05-26 14:12) @lasted(3h33m50s)
+                    ✘ Show HL in frame @cancelled(21-05-26 14:13)
+
         ☐ Update the reward structure accordingly
+
     ☐ @today Create a logging system for everything worth logging
         ☐ Make a list of things to log
         ☐ Quick search how to implement
         ☐ Implement
-    ✔ @today Implement random seed @done(21-05-25 21:37)
+
+    ✔ Implement random seed @done(21-05-25 21:37)
         ✔ Unify random everywhere @done(21-05-25 21:37)
         ✔ Add random seed options to args @done(21-05-25 21:37)
+
+    ☐ @low @today Improve performance @started(21-05-27 10:37)
+        ☐ Implement efficient eval func @started(21-05-27 10:37)
+        ☐ Replace np[:]=val with np[:].fill(val)
     
 MEDA.Experiments:
     ☐ Pilot testing
