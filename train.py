@@ -81,15 +81,15 @@ def plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, size,
     # o_line = np.average(o_rewards, axis = 0)
     a_max = np.max(a_rewards, axis = 0)
     a_min = np.min(a_rewards, axis = 0)
-    o_max = np.max(o_rewards, axis = 0)
-    o_min = np.min(o_rewards, axis = 0)
+    # o_max = np.max(o_rewards, axis = 0)
+    # o_min = np.min(o_rewards, axis = 0)
     episodes = list(range(len(a_max)))
     with plt.style.context('seaborn-paper'):
         plt.rcParams.update({'font.size': 10, 'figure.figsize': (4,3)})
         plt.figure()
         plt.fill_between(episodes, a_max, a_min, facecolor = 'red', alpha = 0.3)
-        plt.fill_between(episodes, o_max, o_min, facecolor = 'blue',
-                alpha = 0.3)
+        # plt.fill_between(episodes, o_max, o_min, facecolor = 'blue',
+        #         alpha = 0.3)
         plt.plot(episodes, a_line, 'r-', label = 'Agent')
         plt.plot(episodes, a_goals_line, 'g.', label = 'Success Rate')
         plt.plot(episodes, a_cycles_line, 'k-.', label = 'No. Cycles')
@@ -240,10 +240,10 @@ if __name__ == '__main__':
         'obs_size': (30,30),
         'droplet_sizes': [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':   8,
-        'n_s':      64,
+        'n_s':      32,
         'n_exps':   1,
-        'n_epochs': 201,
-        'n_steps': 20000,
+        'n_epochs': 101,
+        'n_steps': 2**14,
         'b_save_model': True,
         's_model_name': 'model',
         's_load_model': '',
