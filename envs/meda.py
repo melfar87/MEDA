@@ -58,7 +58,7 @@ class MEDAEnv(gym.Env):
         self.def_delay_counter = delay_counter
         width, height = kwargs['size']
         self.obs_size = obs_size
-        self.reset_counter = 0
+        # self.reset_counter = 0
         # Instance variables
         self.height = height
         self.width = width
@@ -135,10 +135,13 @@ class MEDAEnv(gym.Env):
         self.droplet = np.zeros(4, dtype=np.int)
         self.goal = np.zeros(4, dtype=np.int)
         self.hazard = np.zeros(4, dtype=np.int)
+        self._resetInitialState()
         # Update health
         self._updateHealth()
         # Update distance to goal
-        self.m_distance = self._getDistanceToGoal()
+        # self.m_distance = self._getDistanceToGoal()
+        
+        # Keys mapping for play mode
         try:
             # from pyglet.window import key
             import pygame
@@ -173,7 +176,7 @@ class MEDAEnv(gym.Env):
         Returns:
             obs: Observation
         """
-        self.reset_counter += 1
+        # self.reset_counter += 1
         # Reset steps counter
         self.step_count = 0
         # Reset actuations matrix
@@ -185,7 +188,7 @@ class MEDAEnv(gym.Env):
         # self.m_prev_pattern[:,:] = 0
         # Update health
         self._updateHealth()
-        self.m_distance = self._getDistanceToGoal()
+        # self.m_distance = self._getDistanceToGoal()
         obs = self._getObs()
         # print("Reset #%5d" % self.reset_counter)
         return obs
@@ -225,7 +228,7 @@ class MEDAEnv(gym.Env):
             # Update actuation pattern and compute new position
             prev_dist = self._getDistanceToGoal()
             self._updatePattern(action)
-            self.agt_sta = copy.deepcopy(self.droplet)
+            # self.agt_sta = copy.deepcopy(self.droplet)
             curr_dist = self._getDistanceToGoal()
             # Update the global number of actuations
             self.m_actuations_count += self.m_pattern
@@ -237,7 +240,7 @@ class MEDAEnv(gym.Env):
             done = False
             b_at_goal = 0
             if self._isComplete():
-                reward = 100.0
+                reward = 1.0
                 b_at_goal = 100
                 done = True
             elif self.step_count > self.max_step:
@@ -342,10 +345,10 @@ class MEDAEnv(gym.Env):
         )
         
         # Set the max number of steps allowed
-        self.max_step = 2*(self.hazard[2]-self.hazard[0])*(self.hazard[3]-self.hazard[1])
+        self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
         
         # [TODO] Remove agt_sta and disable old router
-        self.agt_sta = copy.deepcopy(self.droplet)
+        # self.agt_sta = copy.deepcopy(self.droplet)
         return
     
     
