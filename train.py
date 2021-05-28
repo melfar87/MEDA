@@ -21,7 +21,7 @@ def legacyReward(env, b_path = False):
 
 def EvaluatePolicy(model, env,
         n_eval_episodes = 100, b_path = False, render=False):
-    t_eval_s = time.time()
+    # t_eval_s = time.time()
     episode_rewards = np.zeros(n_eval_episodes)
     legacy_rewards = np.zeros(n_eval_episodes)
     reached_goal = np.zeros(n_eval_episodes)
@@ -57,8 +57,8 @@ def EvaluatePolicy(model, env,
     mean_legacy = legacy_rewards.mean()
     mean_goal   = reached_goal.mean()
     mean_cycles = num_cycles.mean()
-    t_eval_e = time.time()
-    print("      Eval took %d seconds" % (t_eval_e-t_eval_s))
+    # t_eval_e = time.time()
+    # print("      Eval took %d seconds" % (t_eval_e-t_eval_s))
     return mean_reward, mean_legacy, mean_goal, mean_cycles
 
 
@@ -125,13 +125,19 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
 
     agent_rewards, old_rewards, episodes = [], [], []
     episode_times, reach_goals, mean_cycles = [], [], []
+    
+    print("INFO: Starting training")
+    print("\tID\tTime\tRewards\tSucc.\tCycles")
     for i in range(n_epochs):
         t2s = time.time()
-        print("INFO: Epoch %2d started" % i)
+        # print("INFO: Epoch %2d started" % i)
         model.learn(total_timesteps = n_steps)
+        t_eval_s = time.time()
         mean_reward, legacy_reward, reach_goal, mean_cycle = \
             EvaluatePolicy(model, model.get_env(), n_eval_episodes = 100,
                            b_path=b_path, render=False)
+        t_eval_e = time.time()
+        t_eval = t_eval_e - t_eval_s
         agent_rewards.append(mean_reward)
         # old_rewards.append(legacy_reward)
         episodes.append(i)
@@ -139,7 +145,13 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         episode_times.append(t2e-t2s)
         reach_goals.append(reach_goal)
         mean_cycles.append(mean_cycle)
-        print("INFO: Epoch %2d ended in %d seconds" % (i,t2e-t2s))
+        t2d = t2e-t2s
+        # print("INFO: Epoch %2d ended in %d seconds" % (i,t2e-t2s))
+        print("INFO: Epoch %3d" % i + 
+              "  %3d/%4d sec"   % (t_eval,t2d)  + 
+              "  %8.3f rew" % mean_reward +
+              "  %4.1f suc" % reach_goal + 
+              "  %5.1f cyc" % mean_cycle )
     agent_rewards = agent_rewards[-n_epochs:]
     # old_rewards = old_rewards[-n_epochs:]
     episodes = episodes[:n_epochs]
@@ -259,6 +271,8 @@ if __name__ == '__main__':
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
     
+    import numpy as np
+    np.set_printoptions(linewidth=np.inf)
     # import matplotlib
     import matplotlib.pyplot as plt
     import tensorflow as tf
