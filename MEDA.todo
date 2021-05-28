@@ -28,7 +28,8 @@ MEDA.Coding:
         ☐ Update the reward structure accordingly
 
     ☐ @today Create a logging system for everything worth logging
-        ☐ Make a list of things to log
+        ☐ Make a list of things to log @started(21-05-27 13:22)
+            ID, time(s), rewards, success rate, no. cycles
         ☐ Quick search how to implement
         ☐ Implement
 
