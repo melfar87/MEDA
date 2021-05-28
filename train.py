@@ -64,16 +64,17 @@ def EvaluatePolicy(model, env,
 
 def showIsGPU():
     if tf.test.is_gpu_available():
-        print("### Training on GPUs... ###")
+        print("\n\n\n##### Training on GPUs... #####\n")
     else:
-        print("### Training on CPUs... ###")
+        print("\n\n\n##### Training on CPUs... #####\n")
+    return
 
 
-def plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, size,
-                         env_info, b_path = False):
-    a_rewards = np.array(a_rewards)
-    a_goals = np.array(a_goals)
-    a_cycles = np.array(a_cycles)
+def plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size,
+                         str_filename, b_path = False):
+    # a_rewards = np.array(a_rewards)
+    # a_goals = np.array(a_goals)
+    # a_cycles = np.array(a_cycles)
     # o_rewards = np.array(o_rewards)
     a_line = np.average(a_rewards, axis = 0)
     a_goals_line = np.average(a_goals, axis = 0)
@@ -85,7 +86,7 @@ def plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, size,
     # o_min = np.min(o_rewards, axis = 0)
     episodes = list(range(len(a_max)))
     with plt.style.context('seaborn-paper'):
-        plt.rcParams.update({'font.size': 10, 'figure.figsize': (4,3)})
+        plt.rcParams.update({'font.size': 10, 'figure.figsize': (6,4)})
         plt.figure()
         plt.fill_between(episodes, a_max, a_min, facecolor = 'red', alpha = 0.3)
         # plt.fill_between(episodes, o_max, o_min, facecolor = 'blue',
@@ -100,41 +101,43 @@ def plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, size,
             leg = plt.legend(loc = 'lower right', shadow = True,
                     fancybox = True)
         leg.get_frame().set_alpha(0.5)
-        plt.title("DMFB " + size)
+        plt.title("MEDA " + str_size)
         plt.xlabel('Training Epochs')
         if b_path:
-            plt.ylabel('Number of Cycles')
+            plt.ylabel('No. Cycles')
         else:
             plt.ylabel('Score')
         plt.tight_layout()
         # Save PNG
-        plt.savefig('log/' + size + env_info + '.png')
+        plt.savefig('log/' + str_filename + '.png')
         # Save TEX
         import tikzplotlib
         tikzplotlib.clean_figure()
-        tikzplotlib.save('log/' + size + env_info + '.tex')
-        #plt.savefig('log/' + size + env_info + '.pgf')
+        tikzplotlib.save('log/' + str_filename + '.tex')
+        
+    return
 
 
-def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
-                    policy_steps=128, b_path=False):
+def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
+                    n_policysteps=128, b_path=False):
     """Run single experiment consisting of a number of episodes
     """
     if model is None:
-        model = PPO2(MyCnnPolicy, env, n_steps = policy_steps)
+        model = PPO2(MyCnnPolicy, env, n_steps=n_policysteps)
 
     agent_rewards, old_rewards, episodes = [], [], []
     episode_times, reach_goals, mean_cycles = [], [], []
     
     print("INFO: Starting training")
-    print("\tID\tTime\tRewards\tSucc.\tCycles")
+    print("            ID   Time         Rewards       Succ.      Cycles")
+    # print("INFO: Epoch   0    4/  30 sec   -58.630 rew   49.0 suc   49.4 cyc")
     for i in range(n_epochs):
         t2s = time.time()
         # print("INFO: Epoch %2d started" % i)
-        model.learn(total_timesteps = n_steps)
+        model.learn(total_timesteps=n_total_timesteps)
         t_eval_s = time.time()
         mean_reward, legacy_reward, reach_goal, mean_cycle = \
-            EvaluatePolicy(model, model.get_env(), n_eval_episodes = 100,
+            EvaluatePolicy(model, model.get_env(), n_eval_episodes=100,
                            b_path=b_path, render=False)
         t_eval_e = time.time()
         t_eval = t_eval_e - t_eval_s
@@ -150,7 +153,7 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
         print("INFO: Epoch %3d" % i + 
               "  %3d/%4d sec"   % (t_eval,t2d)  + 
               "  %8.3f rew" % mean_reward +
-              "  %4.1f suc" % reach_goal + 
+              "  %5.1f suc" % reach_goal + 
               "  %5.1f cyc" % mean_cycle )
     agent_rewards = agent_rewards[-n_epochs:]
     # old_rewards = old_rewards[-n_epochs:]
@@ -158,21 +161,21 @@ def runAnExperiment(env, model=None, n_epochs=50, n_steps=20000,
     return agent_rewards, old_rewards, episodes, reach_goals, mean_cycles, model
 
 
-# def expSeveralRuns(args, n_envs, n_s, n_experiments):
+# def expSeveralRuns(args, n_envs, n_policysteps, n_experiments):
 def expSeveralRuns(args):
     """Run multiple experiments and plot agent performance in one plot
     """
     
     # Load configuration
-    n_s = args.n_s
+    n_policysteps = args.n_policysteps
     n_experiments = args.n_exps
     n_envs = args.n_envs
     n_epochs = args.n_epochs
-    n_steps = args.n_steps
+    n_total_timesteps = args.n_total_timesteps
     b_save_model = args.b_save_model
     str_load_model = args.s_load_model
-    
-    str_size = str(args.size[0]) + 'x' + str(args.size[1])
+    str_model_name = args.s_model_name
+    str_suffix = args.s_suffix
     
     # Configure GPU settings, make environment, and report GPU status
     if sys.platform != 'win32':
@@ -189,12 +192,14 @@ def expSeveralRuns(args):
     else:
         loaded_model = None
         
-    env_info = '_E' + str(n_epochs) + '_X'
+    str_size = str(args.size[0]) + 'x' + str(args.size[1])
+    str_env_info = str_size + '_E' + str(n_epochs)
+    str_filename = str_model_name + '_' + str_env_info + '_' + str_suffix
     # Run Experiments
     for i in range(n_experiments):
         a_r, o_r, episodes, a_g, a_c, model = runAnExperiment(
-            env, model=loaded_model,
-            n_epochs=n_epochs, n_steps=n_steps, policy_steps=n_s
+            env, model=loaded_model, n_epochs=n_epochs,
+            n_total_timesteps=n_total_timesteps, n_policysteps=n_policysteps
         )
         a_rewards.append(a_r)
         a_goals.append(a_g)
@@ -202,9 +207,10 @@ def expSeveralRuns(args):
         a_cycles.append(a_c)
         if b_save_model:
             # model.save("data/model_%s" % getTimeStamp())
-            model.save("data/model_%s" % env_info)
+            model.save("data/%s" % (str_filename))
+            print("\nINFO: Saved as ./data/%s.zip\n" % (str_filename))
             
-    plotAgentPerformance(a_rewards, o_rewards, a_goals, a_cycles, str_size, env_info)
+    plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size, str_filename)
     return
 
 
@@ -219,13 +225,13 @@ def main(args):
     #             'n_modules': 0,
     #             'b_degrade': True,
     #             'per_degrade': 0.1}
-    # expSeveralRuns(args, n_envs=8, n_s=64, n_experiments=1)
+    # expSeveralRuns(args, n_envs=8, n_policysteps=64, n_experiments=1)
     
     t0s = time.time()
     expSeveralRuns(args)
     t0e = time.time()
     print("Time = %d seconds" % (t0e-t0s))
-    print('### Finished train.py successfully ###')
+    print('\n##### Finished train.py successfully #####\n')
     
     return
 
@@ -234,20 +240,21 @@ if __name__ == '__main__':
     
     # List of args default values
     def_args = {
-        'seed': 123,
-        'verbose':  '1',
-        'size':     (30,30),
-        'obs_size': (30,30),
-        'droplet_sizes': [[4,4],[5,4],[5,5],[6,5],[6,6],],
-        'n_envs':   8,
-        'n_s':      32,
-        'n_exps':   1,
-        'n_epochs': 101,
-        'n_steps': 2**14,
-        'b_save_model': True,
-        's_model_name': 'model',
-        's_load_model': '',
-        'b_play_mode': False
+        'seed':              123,
+        'verbose':           '1',
+        'size':              (30,30),
+        'obs_size':          (30,30),
+        'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
+        'n_envs':            8,
+        'n_policysteps':     32,
+        'n_exps':            1,
+        'n_epochs':          2,
+        'n_total_timesteps': 2**14,
+        'b_save_model':      True,
+        's_model_name':      'TMP',
+        's_suffix':          'DEL',
+        's_load_model':      '',
+        'b_play_mode':       False
     }
     
     # Initialize parser
@@ -258,12 +265,13 @@ if __name__ == '__main__':
     parser.add_argument('--obs-size',type=tuple,default=def_args['obs_size'])
     parser.add_argument('--droplet-sizes',type=list,default=def_args['droplet_sizes'])
     parser.add_argument('--n-envs',type=int,default=def_args['n_envs'])
-    parser.add_argument('--n-s',type=int,default=def_args['n_s'])
+    parser.add_argument('--n-policysteps',type=int,default=def_args['n_policysteps'])
     parser.add_argument('--n-exps',type=int,default=def_args['n_exps'])
     parser.add_argument('--n-epochs',type=int,default=def_args['n_epochs'])
-    parser.add_argument('--n-steps',type=int,default=def_args['n_steps'])
+    parser.add_argument('--n-total-timesteps',type=int,default=def_args['n_total_timesteps'])
     parser.add_argument('--b-save-model',type=bool,default=def_args['b_save_model'])
     parser.add_argument('--s-model-name',type=str,default=def_args['s_model_name'])
+    parser.add_argument('--s-suffix',type=str,default=def_args['s_suffix'])
     parser.add_argument('--s-load-model',type=str,default=def_args['s_load_model'])
     parser.add_argument('--b-play-mode',type=bool,default=def_args['b_play_mode'])
     
