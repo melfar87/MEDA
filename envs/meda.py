@@ -438,31 +438,47 @@ class MEDAEnv(gym.Env):
             probN, probS, probE, probW = 0, 0, 0, 0
             if moveN:
                 if dr[3] < y_max:
-                    probN = (
-                        np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[3]],
-                            self.m_degradation[dr[0]-1:dr[2]+1,dr[3]]) /
-                        self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum() )
+                    frontN = self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum()
+                    if frontN > 0:
+                        probN = (
+                            np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[3]],
+                                self.m_degradation[dr[0]-1:dr[2]+1,dr[3]]) /
+                            frontN )
+                    else:
+                        probN = 0
                 moveN = ( random.random() <= probN )
             elif moveS:
                 if dr[1] > y_min:
-                    probS = (
-                        np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1],
-                            self.m_degradation[dr[0]-1:dr[2]+1,dr[1]-1]) /
-                        self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1].sum() )
+                    frontS = self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1].sum()
+                    if frontS > 0:
+                        probS = (
+                            np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1],
+                                self.m_degradation[dr[0]-1:dr[2]+1,dr[1]-1]) /
+                            frontS )
+                    else:
+                        probS = 0
                 moveS = ( random.random() <= probS )
             if moveE:
                 if dr[2] < x_max:
-                    probE = (
-                        np.dot(self.m_pattern[dr[2],dr[1]-1:dr[3]+1],
-                            self.m_degradation[dr[2],dr[1]-1:dr[3]+1]) /
-                        self.m_pattern[dr[2],dr[1]-1:dr[3]+1].sum() )
+                    frontE = self.m_pattern[dr[2],dr[1]-1:dr[3]+1].sum()
+                    if frontE > 0:
+                        probE = (
+                            np.dot(self.m_pattern[dr[2],dr[1]-1:dr[3]+1],
+                                self.m_degradation[dr[2],dr[1]-1:dr[3]+1]) /
+                            frontE )
+                    else:
+                        probE = 0
                 moveE = ( random.random() <= probE )
             elif moveW:
                 if dr[0] > x_min:
-                    probW = (
-                        np.dot(self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1],
-                            self.m_degradation[dr[0]-1,dr[1]-1:dr[3]+1]) /
-                        self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1].sum() )
+                    frontW = self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1].sum()
+                    if frontW > 0:
+                        probW = (
+                            np.dot(self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1],
+                                self.m_degradation[dr[0]-1,dr[1]-1:dr[3]+1]) /
+                            frontW )
+                    else:
+                        probW = 0
                 moveW = ( random.random() <= probW )
             if moveN: dr += [ 0,+1, 0,+1]
             if moveS: dr += [ 0,-1, 0,-1]

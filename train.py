@@ -4,6 +4,7 @@ import sys, argparse
 import os
 import time
 import datetime
+import pickle
 
 
 def getTimeStamp():
@@ -119,7 +120,7 @@ def plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size,
 
 
 def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
-                    n_policysteps=128, b_path=False):
+                    n_policysteps=128, b_path=False, exp_id=0):
     """Run single experiment consisting of a number of episodes
     """
     if model is None:
@@ -128,10 +129,10 @@ def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
     agent_rewards, old_rewards, episodes = [], [], []
     episode_times, reach_goals, mean_cycles = [], [], []
     
-    print("INFO: Starting training")
-    print("            ID   Time         Rewards       Succ.      Cycles")
-    # print("INFO: Epoch   0    4/  30 sec   -58.630 rew   49.0 suc   49.4 cyc")
+    print("+-----------------------------------------------------------------+")
+    #     "INFO: Epoch   0    4/  30 sec   -58.630 rew   49.0 suc   49.4 cyc")
     for i in range(n_epochs):
+        print("|",end=""), sys.stdout.flush()
         t2s = time.time()
         # print("INFO: Epoch %2d started" % i)
         model.learn(total_timesteps=n_total_timesteps)
@@ -150,11 +151,13 @@ def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
         mean_cycles.append(mean_cycle)
         t2d = t2e-t2s
         # print("INFO: Epoch %2d ended in %d seconds" % (i,t2e-t2s))
-        print("INFO: Epoch %3d" % i + 
-              "  %3d/%4d sec"   % (t_eval,t2d)  + 
+        print(" Exp/Epoc %02d-%03d" % (exp_id,i) + 
+              "  %02d/%03d sec"   % (t_eval,t2d)  + 
               "  %8.3f rew" % mean_reward +
               "  %5.1f suc" % reach_goal + 
-              "  %5.1f cyc" % mean_cycle )
+              "  %5.1f cyc" % mean_cycle +
+              " |")
+    print("+-----------------------------------------------------------------+")
     agent_rewards = agent_rewards[-n_epochs:]
     # old_rewards = old_rewards[-n_epochs:]
     episodes = episodes[:n_epochs]
@@ -192,14 +195,19 @@ def expSeveralRuns(args):
     else:
         loaded_model = None
         
-    str_size = str(args.size[0]) + 'x' + str(args.size[1])
-    str_env_info = str_size + '_E' + str(n_epochs)
+    str_size = str(args.size[0]).zfill(3) + 'x' + str(args.size[1]).zfill(3)
+    str_env_info = str_size + '_E' + str(n_epochs).zfill(3)
     str_filename = str_model_name + '_' + str_env_info + '_' + str_suffix
+    
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("+=================================================================+")
+    print("|            ID          Time       Rewards    Success     Cycles |")
     # Run Experiments
     for i in range(n_experiments):
         a_r, o_r, episodes, a_g, a_c, model = runAnExperiment(
             env, model=loaded_model, n_epochs=n_epochs,
-            n_total_timesteps=n_total_timesteps, n_policysteps=n_policysteps
+            n_total_timesteps=n_total_timesteps, n_policysteps=n_policysteps,
+            exp_id=i
         )
         a_rewards.append(a_r)
         a_goals.append(a_g)
@@ -207,10 +215,24 @@ def expSeveralRuns(args):
         a_cycles.append(a_c)
         if b_save_model:
             # model.save("data/model_%s" % getTimeStamp())
-            model.save("data/%s" % (str_filename))
-            print("\nINFO: Saved as ./data/%s.zip\n" % (str_filename))
+            model.save("data/%s" % (str_filename + "_" + str(i).zfill(2)))
+            print("| Model saved as  %47s |" 
+                  % ("./data/" + str_filename + "_" + str(i).zfill(2) + ".zip"))
             
+    data_obj = {
+        'str_filename': str_filename,
+        'a_rewards': a_rewards,
+        'a_goals': a_goals,
+        'a_cycles': a_cycles,
+        'args': args
+    }
+    with open("data/%s.pickle" % str_filename, 'wb') as f:
+        pickle.dump(data_obj, f)
+    print("| Data saved as   %47s |" % ("./data/"+str_filename+".pickle"))
     plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size, str_filename)
+    print("| Figure saved as %47s |" % ("./log/"+str_filename+".png"))
+    print("| Tikz saved as   %47s |" % ("./log/"+str_filename+".tex"))
+    print("+-----------------------------------------------------------------+")
     return
 
 
@@ -227,11 +249,13 @@ def main(args):
     #             'per_degrade': 0.1}
     # expSeveralRuns(args, n_envs=8, n_policysteps=64, n_experiments=1)
     
-    t0s = time.time()
+    t_total_s = time.time()
     expSeveralRuns(args)
-    t0e = time.time()
-    print("Time = %d seconds" % (t0e-t0s))
-    print('\n##### Finished train.py successfully #####\n')
+    t_total_e = time.time()
+    t_total = t_total_e - t_total_s
+    print("| Finished training in %26s %4d min %2d sec |" 
+          % (" ",t_total//60, t_total%60))
+    print("+=================================================================+\n")
     
     return
 
@@ -241,7 +265,7 @@ if __name__ == '__main__':
     # List of args default values
     def_args = {
         'seed':              123,
-        'verbose':           '1',
+        'verbose':           '3',
         'size':              (30,30),
         'obs_size':          (30,30),
         'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
@@ -252,7 +276,7 @@ if __name__ == '__main__':
         'n_total_timesteps': 2**14,
         'b_save_model':      True,
         's_model_name':      'TMP',
-        's_suffix':          'DEL',
+        's_suffix':          'FIX',
         's_load_model':      '',
         'b_play_mode':       False
     }
@@ -279,6 +303,10 @@ if __name__ == '__main__':
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
     
+    import warnings
+    warnings.filterwarnings("ignore", message=r"Passing", category=FutureWarning)
+    warnings.filterwarnings("ignore", message=r"The name")
+    
     import numpy as np
     np.set_printoptions(linewidth=np.inf)
     # import matplotlib
@@ -298,5 +326,7 @@ if __name__ == '__main__':
     if args.seed >= 0:
         from stable_baselines.common.misc_util import set_global_seeds
         set_global_seeds(args.seed)
+        
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     
     main(args)
