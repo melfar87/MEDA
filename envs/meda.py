@@ -10,22 +10,23 @@ from gym import error, spaces, utils
 import cv2
 
 
-class DirectionSimple(IntEnum):
-    NN = 0  # North
-    EE = 1  # East
-    SS = 2  # South
-    WW = 3  # West
+# class DirectionSimple(IntEnum):
+#     NN = 0  # North
+#     EE = 1  # East
+#     SS = 2  # South
+#     WW = 3  # West
     
 
 class Direction(IntEnum):
-    NN = 1  # North
-    EE = 2  # East
-    SS = 3  # South
-    WW = 4  # West
-    NE = 5  # N. East
-    NW = 6  # N. West
-    SE = 7  # S. East
-    SW = 8  # S. West
+    ZZ = 0  # Sleep/Stop
+    NN = 1  
+    NE = 2  
+    EE = 3  
+    SE = 4  
+    SS = 5  
+    SW = 6  
+    WW = 7  
+    NW = 8  
 
 
 class MEDAEnv(gym.Env):
@@ -34,8 +35,9 @@ class MEDAEnv(gym.Env):
                 'video.frames_per_second': 2}
 
     def __init__(self, width=0, height=0, droplet_sizes=[[4,4],], n_bits=2,
-                 b_degrade=True, per_degrade=0.1, b_use_dict=False,
+                 b_degrade=True, b_use_dict=False,
                  b_unify_obs=True, b_parm_step=True, obs_size=(30, 30),
+                 deg_mode='normal', deg_perc=0.1, deg_size=1,
                  b_play_mode=False, delay_counter = 10,
                  **kwargs):
         """ Gym Constructor for MEDA
@@ -49,6 +51,9 @@ class MEDAEnv(gym.Env):
         """
         super(MEDAEnv, self).__init__()
         self.viewer = None
+        self.actions = Direction
+        
+        # Play mode
         try:
             self.b_play_mode = kwargs['b_play_mode']
         except:
@@ -56,42 +61,41 @@ class MEDAEnv(gym.Env):
         print("INFO: Play mode is %s" % ("ENABLED" if self.b_play_mode else "DISABLED"))
         self.delay_counter = 0
         self.def_delay_counter = delay_counter
+        
+        # Configs
         width, height = kwargs['size']
         self.obs_size = obs_size
-        # self.reset_counter = 0
-        # Instance variables
         self.height = height
         self.width = width
         assert height > 4 and width > 4
         self.n_bits = n_bits
         self.b_unify_obs = b_unify_obs
         self.b_parm_step = b_parm_step
-        self.actions = Direction
-        # Degradation parameters
+        self.droplet_sizes = droplet_sizes
         self.b_degrade = b_degrade
+        self.deg_mode = deg_mode
+        self.deg_perc = deg_perc
+        self.deg_size = deg_size
+        self.xs0range = [3,]
+        self.ys0range = [1,3,]
+        self.act_count = np.zeros(9)
+        
+        # State vars
+        self.droplet = np.zeros(4, dtype=np.int)
+        self.goal = np.zeros(4, dtype=np.int)
+        self.hazard = np.zeros(4, dtype=np.int)
         self.m_taus = np.ones((width, height)) * 0.8
         self.m_C1s = np.ones((width, height)) * 0
         self.m_C2s = np.ones((width, height)) * 200
-        # Degradation matrix
         self.m_degradation = np.ones((width, height))
-        # Health matrix
         self.m_health = np.ones((width, height))
-        # Actuations count matrix
         self.m_actuations_count = np.zeros((width, height))
-        # Control pattern
         self.m_pattern = np.zeros((width, height), dtype=np.uint8)
-        # self.m_prev_pattern = np.zeros((width, height))
-        # Number of steps 
         self.step_count = 0
-        # Maximum number of steps
-        self.max_step = 0 # 2 * (height + width)
-        # List of droplet sizes
-        self.droplet_sizes = droplet_sizes
-        # Droplet range
-        self.xs0range = [3,]
-        self.ys0range = [1,3,]
+        self.max_step = 0
 
-        # Gym environment: action space
+        # Gym environment: rewards and action space
+        self.reward_range = (-100.0, 1.0)
         self.action_space = spaces.Discrete(len(self.actions))
         if b_use_dict:
             self.observation_space = spaces.Dict({
@@ -104,10 +108,6 @@ class MEDAEnv(gym.Env):
             })
             self.keys = list(self.observation_space.spaces.keys())
         else:
-            # Layers: (
-                # 0: goal,
-                # 1: sensors (droplet),
-                # 2: health )
             self.n_layers = 3
             self.goal_layer_id = 0
             self.droplet_layer_id = 1
@@ -124,22 +124,6 @@ class MEDAEnv(gym.Env):
                 self.observation_space = spaces.Box(
                     low=0, high=1,
                     shape=(width, height, self.n_layers), dtype=np.float)
-                
-        # Provide reward range since some algorithms may need it
-        self.reward_range = (-100.0, 1.0)
-        
-        # Reset actuations matrix
-        self._resetActuationMatrix()
-        # Initialize droplet/goal/hazard locations and reset initial state
-        # self._resetInitialState()
-        self.droplet = np.zeros(4, dtype=np.int)
-        self.goal = np.zeros(4, dtype=np.int)
-        self.hazard = np.zeros(4, dtype=np.int)
-        self._resetInitialState()
-        # Update health
-        self._updateHealth()
-        # Update distance to goal
-        # self.m_distance = self._getDistanceToGoal()
         
         # Keys mapping for play mode
         try:
@@ -159,15 +143,19 @@ class MEDAEnv(gym.Env):
         except:
             print("INFO: PYGLET failed to load")
             self.keys_to_action = None
-            
+        
+        # Reset initial state
+        self._resetActuationMatrix()
+        self._resetInitialState()
+        self._resetInitialHealth()
+        self._updateHealth()
+        
         return
 
-    # @property
-    # def spec(self):
-    #     return self.env.spec
     
     def get_keys_to_action(self):
         return self.keys_to_action
+
 
     # Gym Interfaces
     def reset(self):
@@ -176,21 +164,12 @@ class MEDAEnv(gym.Env):
         Returns:
             obs: Observation
         """
-        # self.reset_counter += 1
-        # Reset steps counter
         self.step_count = 0
-        # Reset actuations matrix
         self._resetActuationMatrix(is_random=False)
-        # Get new start and goal locations and reset initial state
         self._resetInitialState()
-        # Reset actuation pattern
-        self.m_pattern[:,:] = 0
-        # self.m_prev_pattern[:,:] = 0
-        # Update health
+        self._resetInitialHealth()
         self._updateHealth()
-        # self.m_distance = self._getDistanceToGoal()
         obs = self._getObs()
-        # print("Reset #%5d" % self.reset_counter)
         return obs
     
     
@@ -208,13 +187,16 @@ class MEDAEnv(gym.Env):
                 dictionary
                 )
         """
+        self.act_count[action] += 1
+        
+        # Keyboard debouncing in play mode
         if self.b_play_mode:
             if self.delay_counter==0:
-                if action is not 0:
+                if action != 0:
                     # Accept action and start delay counter
                     self.delay_counter = self.def_delay_counter
             elif self.delay_counter > 0:
-                if action is not 0:
+                if action != 0:
                     # Reject action and keep counting down
                     action = 0
                 else:
@@ -222,41 +204,43 @@ class MEDAEnv(gym.Env):
                     self.delay_counter = 0
             else:
                 print("WTF")
-                
-        if action is not 0:
-            self.step_count += 1
-            # Update actuation pattern and compute new position
-            prev_dist = self._getDistanceToGoal()
-            self._updatePattern(action)
-            # self.agt_sta = copy.deepcopy(self.droplet)
-            curr_dist = self._getDistanceToGoal()
-            # Update the global number of actuations
-            self.m_actuations_count += self.m_pattern
-            # Update biochop health
-            self._updateHealth()
-            # Update observation
-            obs = self._getObs()
-            # Compute rewards
-            done = False
-            b_at_goal = 0
-            if self._isComplete():
-                reward = 1.0
-                b_at_goal = 100
-                done = True
-            elif self.step_count > self.max_step:
-                reward = -100
-                done = True
-            elif prev_dist > curr_dist:  # move toward the goal
-                reward = 0.5*(prev_dist-curr_dist)
-            elif prev_dist == curr_dist:
-                reward = -0.3
-            else:  # move away the goal
-                reward = -0.8*(curr_dist-prev_dist)
-        else:
-            obs = self._getObs()
-            reward = 0
-            done = self._isComplete() or (self.step_count > self.max_step)
-            b_at_goal = 100 if done else 0
+            
+            # Ignore "loiter" action in play mode 
+            if action !=0:
+                obs = self._getObs()
+                reward = 0
+                done = self._isComplete() or (self.step_count > self.max_step)
+                b_at_goal = 100 if done else 0
+                return obs, reward, done, {
+                    "b_at_goal":b_at_goal, "num_cycles":self.step_count}
+
+        self.step_count += 1
+        prev_dist = self._getDistanceToGoal()
+        self._updatePattern(action)
+        curr_dist = self._getDistanceToGoal()
+        self.m_actuations_count += self.m_pattern
+        self._updateHealth()
+        obs = self._getObs()
+        done = False
+        b_at_goal = 0
+        if self._isComplete():
+            reward = 1.0
+            b_at_goal = 100
+            done = True
+        elif self.step_count > self.max_step:
+            reward = -100
+            done = True
+        elif prev_dist > curr_dist:  # move toward the goal
+            reward = 0.5*(prev_dist-curr_dist)
+        elif action == Direction.ZZ: # penalize stopping
+            reward = -100
+            done = True
+        elif prev_dist == curr_dist:
+            reward = -0.3
+        else:  # move away the goal
+            reward = -0.8*(curr_dist-prev_dist)
+        
+            
         return obs, reward, done, {"b_at_goal":b_at_goal, "num_cycles":self.step_count}
 
 
@@ -352,9 +336,30 @@ class MEDAEnv(gym.Env):
         return
     
     
+    def _resetInitialHealth(self):
+        """Resets initial health parameters
+        """
+        self.m_taus.fill(0.8)
+        self.m_C1s.fill(0)
+        self.m_C2s.fill(200)
+        if self.deg_mode=='normal':
+            pass
+        elif self.deg_mode=='random':
+            items = np.random.choice(
+                self.m_C1s.size, int(self.m_C1s.size * self.deg_perc/self.deg_size),
+                replace=False)
+            for idx in items:
+                r,c = idx // self.m_C1s.shape[1], idx % self.m_C1s.shape[1]
+                self.m_C1s[r:r+self.deg_size, c:c+self.deg_size].fill(np.Inf)
+        else:
+            raise Exception("Unknown degradation mode: %s" % self.deg_mode)
+        return
+        
+    
     def _resetActuationMatrix(self, is_random=False):
         """Resets actuation matrix
         """
+        self.m_pattern.fill(0)
         if is_random:
             self.m_actuations_count = random.randint(0,1000)
             self.m_actuations_count = np.random.randint(

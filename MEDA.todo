@@ -10,7 +10,7 @@ MEDA.PaperWriting:
 
 MEDA.Coding:
     `Must finish this first and foremost!`
-    ☐ @critical @today Finish major changes before pilot testing @started(21-05-25 21:59)
+    ✔ @critical Finish major changes before pilot testing @started(21-05-25 21:59) @done(21-06-02 08:31) @lasted(1w10h32m33s)
         ✔ Randomize droplet size @started(21-05-25 20:13) @done(21-05-25 21:55) @lasted(1h42m35s)
         ✔ Apply padding using the hazard zone @started(21-05-25 21:56) @done(21-05-26 00:03) @lasted(2h7m3s)
             ✔ Remove the extra layer from observation @started(21-05-25 22:43) @done(21-05-26 00:02) @lasted(1h19m40s)
@@ -25,9 +25,9 @@ MEDA.Coding:
                     ✔ Use HL for actions @started(21-05-26 10:39) @done(21-05-26 14:12) @lasted(3h33m50s)
                     ✘ Show HL in frame @cancelled(21-05-26 14:13)
 
-        ☐ Update the reward structure accordingly
+        ✔ Update the reward structure accordingly @done(21-06-02 08:31)
 
-    ☐ @today Create a logging system for everything worth logging
+    ☐ Create a logging system for everything worth logging
         ☐ Make a list of things to log @started(21-05-27 13:22)
             ID, time(s), rewards, success rate, no. cycles
         ☐ Quick search how to implement
@@ -37,9 +37,17 @@ MEDA.Coding:
         ✔ Unify random everywhere @done(21-05-25 21:37)
         ✔ Add random seed options to args @done(21-05-25 21:37)
 
-    ☐ @low @today Improve performance @started(21-05-27 10:37)
-        ☐ Implement efficient eval func @started(21-05-27 10:37)
+    ☐ @low Improve performance @started(21-05-27 10:37)
+        ✔ Implement efficient eval func @started(21-05-27 10:37) @done(21-05-28 16:43) @lasted(1d6h6m30s)
         ☐ Replace np[:]=val with np[:].fill(val)
+
+    ☐ @today Implement randomized degradation
+        ✔ @high Implement _resetInitialHealth @started(21-06-01 18:38) @done(21-06-02 07:45) @lasted(13h7m49s)
+            ✔ Implement normal mode @started(21-06-01 18:38) @done(21-06-01 18:39) @lasted(1m21s)
+            ✔ Implement random mode @started(21-06-01 18:54) @done(21-06-02 07:45) @lasted(12h51m41s)
+            ✔ Implement clustered mode @started(21-06-01 18:54) @done(21-06-02 07:45) @lasted(12h51m42s)
+        ✔ Apply mods to init() and reset() @started(21-06-02 07:45) @done(21-06-02 08:30) @lasted(45m23s)
+        ☐ Smoke test @started(21-06-02 08:30)
     
 MEDA.Experiments:
     ☐ Pilot testing

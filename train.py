@@ -138,7 +138,7 @@ def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
         model.learn(total_timesteps=n_total_timesteps)
         t_eval_s = time.time()
         mean_reward, legacy_reward, reach_goal, mean_cycle = \
-            EvaluatePolicy(model, model.get_env(), n_eval_episodes=100,
+            EvaluatePolicy(model, model.get_env(), n_eval_episodes=300,
                            b_path=b_path, render=False)
         t_eval_e = time.time()
         t_eval = t_eval_e - t_eval_s
@@ -182,7 +182,7 @@ def expSeveralRuns(args):
     
     # Configure GPU settings, make environment, and report GPU status
     if sys.platform != 'win32':
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5,allow_growth=True)
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1.0,allow_growth=True)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=vars(args))
     showIsGPU()
@@ -200,6 +200,7 @@ def expSeveralRuns(args):
     str_filename = str_model_name + '_' + str_env_info + '_' + str_suffix
     
     os.system('cls' if os.name == 'nt' else 'clear')
+    print(getTimeStamp())
     print("+=================================================================+")
     print("|            ID          Time       Rewards    Success     Cycles |")
     # Run Experiments
@@ -255,7 +256,9 @@ def main(args):
     t_total = t_total_e - t_total_s
     print("| Finished training in %26s %4d min %2d sec |" 
           % (" ",t_total//60, t_total%60))
-    print("+=================================================================+\n")
+    print("+=================================================================+")
+    print(getTimeStamp())
+    print(" ")
     
     return
 
@@ -264,21 +267,25 @@ if __name__ == '__main__':
     
     # List of args default values
     def_args = {
-        'seed':              123,
+        'seed':              777,
         'verbose':           '3',
-        'size':              (30,30),
+        'size':              (90,90),
         'obs_size':          (30,30),
         'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':            8,
         'n_policysteps':     32,
-        'n_exps':            1,
-        'n_epochs':          2,
+        'n_exps':            3,
+        'n_epochs':          25,
         'n_total_timesteps': 2**14,
         'b_save_model':      True,
-        's_model_name':      'TMP',
-        's_suffix':          'FIX',
-        's_load_model':      '',
-        'b_play_mode':       False
+        's_model_name':      'MDL_C',
+        's_suffix':          'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
+        's_load_model':      'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
+        'b_play_mode':       False,
+        'deg_mode':          'random',
+        'deg_perc':          0.2,
+        'deg_size':          2,
+        'description':       ''
     }
     
     # Initialize parser
@@ -298,11 +305,13 @@ if __name__ == '__main__':
     parser.add_argument('--s-suffix',type=str,default=def_args['s_suffix'])
     parser.add_argument('--s-load-model',type=str,default=def_args['s_load_model'])
     parser.add_argument('--b-play-mode',type=bool,default=def_args['b_play_mode'])
+    parser.add_argument('--deg-mode',type=str,default=def_args['deg_mode'])
+    parser.add_argument('--deg-perc',type=float,default=def_args['deg_perc'])
+    parser.add_argument('--deg-size',type=int,default=def_args['deg_size'])
     
     args = parser.parse_args()
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
-    
     import warnings
     warnings.filterwarnings("ignore", message=r"Passing", category=FutureWarning)
     warnings.filterwarnings("ignore", message=r"The name")
