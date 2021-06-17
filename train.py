@@ -6,6 +6,33 @@ import time
 import datetime
 import pickle
 
+# from utils import *
+
+def main(args):
+    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
+    # b_backup_model = True
+    # t0s = time.time()
+    # Sizes are (width, height)
+    # sizes = [(30,30),]
+    # for s in sizes:
+    #     args = {'width': s[1], 'height': s[0],
+    #             'n_modules': 0,
+    #             'b_degrade': True,
+    #             'per_degrade': 0.1}
+    # expSeveralRuns(args, n_envs=8, n_policysteps=64, n_experiments=1)
+    
+    t_total_s = time.time()
+    expSeveralRuns(args)
+    t_total_e = time.time()
+    t_total = t_total_e - t_total_s
+    print("| Finished training in %26s %4d min %2d sec |" 
+          % (" ",t_total//60, t_total%60))
+    print("+=================================================================+")
+    print(getTimeStamp())
+    print(" ")
+    
+    return
+
 
 def getTimeStamp():
     now = datetime.datetime.now()
@@ -237,39 +264,13 @@ def expSeveralRuns(args):
     return
 
 
-def main(args):
-    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
-    # b_backup_model = True
-    # t0s = time.time()
-    # Sizes are (width, height)
-    # sizes = [(30,30),]
-    # for s in sizes:
-    #     args = {'width': s[1], 'height': s[0],
-    #             'n_modules': 0,
-    #             'b_degrade': True,
-    #             'per_degrade': 0.1}
-    # expSeveralRuns(args, n_envs=8, n_policysteps=64, n_experiments=1)
-    
-    t_total_s = time.time()
-    expSeveralRuns(args)
-    t_total_e = time.time()
-    t_total = t_total_e - t_total_s
-    print("| Finished training in %26s %4d min %2d sec |" 
-          % (" ",t_total//60, t_total%60))
-    print("+=================================================================+")
-    print(getTimeStamp())
-    print(" ")
-    
-    return
-
-
 if __name__ == '__main__':
     
     # List of args default values
     def_args = {
-        'seed':              777,
+        'seed':              111,
         'verbose':           '3',
-        'size':              (90,90),
+        'size':              (30,30),
         'obs_size':          (30,30),
         'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':            8,
@@ -278,11 +279,11 @@ if __name__ == '__main__':
         'n_epochs':          25,
         'n_total_timesteps': 2**14,
         'b_save_model':      True,
-        's_model_name':      'MDL_C',
+        's_model_name':      'TMP_D',
         's_suffix':          'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
-        's_load_model':      'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
+        's_load_model':      '', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
         'b_play_mode':       False,
-        'deg_mode':          'random',
+        'deg_mode':          'normal',
         'deg_perc':          0.2,
         'deg_size':          2,
         'description':       ''
@@ -321,7 +322,7 @@ if __name__ == '__main__':
     # import matplotlib
     import matplotlib.pyplot as plt
     import tensorflow as tf
-    from utils import OldRouter
+    # from utils import OldRouter
     from my_net import MyCnnPolicy
     # from envs.dmfb import *
     from envs.meda import *
