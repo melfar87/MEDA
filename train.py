@@ -6,6 +6,9 @@ import time
 import datetime
 import pickle
 
+from matplotlib.pyplot import pause
+import matplotlib.animation as animation
+
 # from utils import *
 
 def main(args):
@@ -62,13 +65,13 @@ def EvaluatePolicy(model, env,
     episode_count = 0
     while (episode_count < n_eval_episodes):
         # Make predictions and take action on all envs
-        action, state = model.predict(obs)
+        action, state = model.predict(obs, deterministic=True)
         obs, reward, done, _info = env.step(action)
         episode_reward += reward
         # [TODO] Implement render option for vectorized environments
-        # if render:
-        #     env.envs[0].render()
-        #     # time.sleep(0.001)
+        if render:
+            env.envs[0].render()
+            # time.sleep(0.001)
         for env_id in range(env.num_envs):
             if done[env_id]:
                 # If environment is done, create a record
@@ -165,7 +168,7 @@ def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
         model.learn(total_timesteps=n_total_timesteps)
         t_eval_s = time.time()
         mean_reward, legacy_reward, reach_goal, mean_cycle = \
-            EvaluatePolicy(model, model.get_env(), n_eval_episodes=300,
+            EvaluatePolicy(model, model.get_env(), n_eval_episodes=100,
                            b_path=b_path, render=False)
         t_eval_e = time.time()
         t_eval = t_eval_e - t_eval_s
@@ -191,6 +194,85 @@ def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
     return agent_rewards, old_rewards, episodes, reach_goals, mean_cycles, model
 
 
+def runTest(env, model=None, n_epochs=50, exp_id=0, render=False,
+            n_eval_episodes=300):
+    """Run test cases
+    """
+    if model is None:
+        print("ERROR: No model found. Aborting...")
+        return
+
+    # agent_rewards, old_rewards, episodes = [], [], []
+    # episode_times, reach_goals, mean_cycles = [], [], []
+    
+    n_eval_episodes = 100
+    
+    print("+-----------------------------------------------------------------+")
+    #     "INFO: Epoch   0    4/  30 sec   -58.630 rew   49.0 suc   49.4 cyc")
+    for i in range(n_epochs):
+        print("|",end=""), sys.stdout.flush()
+        t2s = time.time()
+        t_eval_s = time.time()
+
+        obs = env.reset()
+        episode_reward = np.zeros(env.num_envs)
+        episode_count = 0
+        for env_idx in range(env.num_envs):
+            obs[env_idx] = env.envs[env_idx].setState(
+                 dr_s=np.array([2,2,6,6]),
+                 dr_g=np.array([20,10,24,14]),
+                 m_taus=np.ones_like(env.envs[env_idx].m_taus)*0.7,
+                 m_c1s=np.zeros_like(env.envs[env_idx].m_C1s),
+                 m_c2s=np.ones_like(env.envs[env_idx].m_C2s)*300,
+                 m_actcount=np.zeros_like(env.envs[env_idx].m_actcount)
+            )
+        while (episode_count < n_eval_episodes):
+            # Make predictions and take action on all envs
+            action, state = model.predict(obs, deterministic=True)
+            obs, reward, done, _info = env.step(action)
+            episode_reward += reward
+            # [TODO] Implement render option for vectorized environments
+            if render:
+                env.envs[0].render(mode='human_frame')
+                # time.sleep(0.001)
+            for env_id in range(env.num_envs):
+                if done[env_id]:
+                    # If environment is done, create a record
+                    episode_rewards[episode_count] = episode_reward[env_id]
+                    reached_goal[episode_count] = _info[env_id]["b_at_goal"]
+                    num_cycles[episode_count] = _info[env_id]["num_cycles"]
+                    
+                    # Reset respective environment
+                    episode_reward[env_id] = 0
+                    episode_reward[env_id] = 0
+                    # Increment no. of episodes, break if no more episodes are needed
+                    episode_count+=1
+                    if episode_count >= n_eval_episodes: break
+        
+        t_eval_e = time.time()
+        t_eval = t_eval_e - t_eval_s
+        # agent_rewards.append(mean_reward)
+        # old_rewards.append(legacy_reward)
+        # episodes.append(i)
+        t2e = time.time()
+        # episode_times.append(t2e-t2s)
+        # reach_goals.append(reach_goal)
+        # mean_cycles.append(mean_cycle)
+        t2d = t2e-t2s
+        # print("INFO: Epoch %2d ended in %d seconds" % (i,t2e-t2s))
+        print(" Exp/Epoc %02d-%03d" % (exp_id,i) + 
+              "  %02d/%03d sec"   % (t_eval,t2d)  + 
+              "  %8.3f rew" % 0 +
+              "  %5.1f suc" % 0 + 
+              "  %5.1f cyc" % 0 +
+              " |")
+    print("+-----------------------------------------------------------------+")
+    # agent_rewards = agent_rewards[-n_epochs:]
+    # old_rewards = old_rewards[-n_epochs:]
+    # episodes = episodes[:n_epochs]
+    return
+
+
 # def expSeveralRuns(args, n_envs, n_policysteps, n_experiments):
 def expSeveralRuns(args):
     """Run multiple experiments and plot agent performance in one plot
@@ -206,6 +288,7 @@ def expSeveralRuns(args):
     str_load_model = args.s_load_model
     str_model_name = args.s_model_name
     str_suffix = args.s_suffix
+    str_mode = args.s_mode
     
     # Configure GPU settings, make environment, and report GPU status
     if sys.platform != 'win32':
@@ -227,40 +310,54 @@ def expSeveralRuns(args):
     str_filename = str_model_name + '_' + str_env_info + '_' + str_suffix
     
     os.system('cls' if os.name == 'nt' else 'clear')
-    print(getTimeStamp())
-    print("+=================================================================+")
-    print("|            ID          Time       Rewards    Success     Cycles |")
-    # Run Experiments
-    for i in range(n_experiments):
-        a_r, o_r, episodes, a_g, a_c, model = runAnExperiment(
-            env, model=loaded_model, n_epochs=n_epochs,
-            n_total_timesteps=n_total_timesteps, n_policysteps=n_policysteps,
-            exp_id=i
-        )
-        a_rewards.append(a_r)
-        a_goals.append(a_g)
-        o_rewards.append(o_r)
-        a_cycles.append(a_c)
-        if b_save_model:
-            # model.save("data/model_%s" % getTimeStamp())
-            model.save("data/%s" % (str_filename + "_" + str(i).zfill(2)))
-            print("| Model saved as  %47s |" 
-                  % ("./data/" + str_filename + "_" + str(i).zfill(2) + ".zip"))
+    
+    if str_mode == 'train':
+        print("### TRAIN ### " + getTimeStamp() + " ###")
+        print("+=================================================================+")
+        print("|            ID          Time       Rewards    Success     Cycles |")
+        # Run Experiments
+        for i in range(n_experiments):
+            a_r, o_r, episodes, a_g, a_c, model = runAnExperiment(
+                env, model=loaded_model, n_epochs=n_epochs,
+                n_total_timesteps=n_total_timesteps, n_policysteps=n_policysteps,
+                exp_id=i
+            )
+            a_rewards.append(a_r)
+            a_goals.append(a_g)
+            o_rewards.append(o_r)
+            a_cycles.append(a_c)
+            if b_save_model:
+                # model.save("data/model_%s" % getTimeStamp())
+                model.save("data/%s" % (str_filename + "_" + str(i).zfill(2)))
+                print("| Model saved as  %47s |" 
+                    % ("./data/" + str_filename + "_" + str(i).zfill(2) + ".zip"))
             
-    data_obj = {
-        'str_filename': str_filename,
-        'a_rewards': a_rewards,
-        'a_goals': a_goals,
-        'a_cycles': a_cycles,
-        'args': args
-    }
-    with open("data/%s.pickle" % str_filename, 'wb') as f:
-        pickle.dump(data_obj, f)
-    print("| Data saved as   %47s |" % ("./data/"+str_filename+".pickle"))
-    plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size, str_filename)
-    print("| Figure saved as %47s |" % ("./log/"+str_filename+".png"))
-    print("| Tikz saved as   %47s |" % ("./log/"+str_filename+".tex"))
-    print("+-----------------------------------------------------------------+")
+        data_obj = {
+            'str_filename': str_filename,
+            'a_rewards': a_rewards,
+            'a_goals': a_goals,
+            'a_cycles': a_cycles,
+            'args': args
+        }
+        with open("data/%s.pickle" % str_filename, 'wb') as f:
+            pickle.dump(data_obj, f)
+        print("| Data saved as   %47s |" % ("./data/"+str_filename+".pickle"))
+        plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size, str_filename)
+        print("| Figure saved as %47s |" % ("./log/"+str_filename+".png"))
+        print("| Tikz saved as   %47s |" % ("./log/"+str_filename+".tex"))
+        print("+-----------------------------------------------------------------+")
+    
+    elif str_mode=='test':
+        print("### TEST ### " + getTimeStamp() + " ###")
+        
+        for i in range(n_experiments):
+            runTest(env, model=loaded_model, n_epochs=n_epochs, exp_id=i,
+                    render=True)
+    
+    else:
+        print('ERROR: Unknown mode. Aborting...')        
+            
+
     return
 
 
@@ -268,31 +365,33 @@ if __name__ == '__main__':
     
     # List of args default values
     def_args = {
-        'seed':              111,
+        'seed':              -1,
         'verbose':           '3',
+        's_mode':            'train', # train | test
         'size':              (30,30),
         'obs_size':          (30,30),
         'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':            8,
-        'n_policysteps':     32,
-        'n_exps':            3,
-        'n_epochs':          25,
+        'n_policysteps':     32, # [NOTE][2021-07-25] Was 32
+        'n_exps':            1,
+        'n_epochs':          50,
         'n_total_timesteps': 2**14,
         'b_save_model':      True,
-        's_model_name':      'TMP_D',
-        's_suffix':          'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
-        's_load_model':      '', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
-        'b_play_mode':       False,
+        's_model_name':      '0726c',
+        's_suffix':          'NPS32', #'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
+        's_load_model':      '', #'0726b_030x030_E050_NPS16_00', #'TMP_E_030x030_E040__00',#'TMP_D_030x030_E025_T30V300TL_D22_00', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
+        'b_play_mode':       True,
         'deg_mode':          'normal',
         'deg_perc':          0.2,
         'deg_size':          2,
-        'description':       ''
+        'description':       'Full random initial state'
     }
     
     # Initialize parser
     parser = argparse.ArgumentParser(description='MEDA Training Module')
     parser.add_argument('--seed',type=int,default=def_args['seed'])
     parser.add_argument('--verbose',type=str,default=def_args['verbose'])
+    parser.add_argument('--s-mode',type=str,default=def_args['s_mode'])
     parser.add_argument('--size',type=tuple,default=def_args['size'])
     parser.add_argument('--obs-size',type=tuple,default=def_args['obs_size'])
     parser.add_argument('--droplet-sizes',type=list,default=def_args['droplet_sizes'])
@@ -309,14 +408,12 @@ if __name__ == '__main__':
     parser.add_argument('--deg-mode',type=str,default=def_args['deg_mode'])
     parser.add_argument('--deg-perc',type=float,default=def_args['deg_perc'])
     parser.add_argument('--deg-size',type=int,default=def_args['deg_size'])
-    
     args = parser.parse_args()
     
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
     import warnings
     warnings.filterwarnings("ignore", message=r"Passing", category=FutureWarning)
     warnings.filterwarnings("ignore", message=r"The name")
-    
     import numpy as np
     np.set_printoptions(linewidth=np.inf)
     # import matplotlib
@@ -331,12 +428,10 @@ if __name__ == '__main__':
     # from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
     # from stable_baselines.common.evaluation import evaluate_policy
     from stable_baselines import PPO2
-    
     # Set random seeds before starting for SB, Random, tensorflow, numpy, gym
     if args.seed >= 0:
         from stable_baselines.common.misc_util import set_global_seeds
         set_global_seeds(args.seed)
-        
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
     
     main(args)

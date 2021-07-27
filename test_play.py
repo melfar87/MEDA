@@ -41,7 +41,7 @@ if __name__ == '__main__':
     def_args = {
         'seed': 123,
         'verbose':  '1',
-        'size':     (60,60),
+        'size':     (30,30),
         'droplet_sizes': [[4,4],],
         'n_envs':   8,
         'n_s':      64,
