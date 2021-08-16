@@ -1,5 +1,6 @@
 from enum import IntEnum
 import numpy as np
+from stable_baselines.common.schedules import Schedule
 
 
 
@@ -12,8 +13,6 @@ class State(IntEnum):
     DONE = 5
 
 
-
-    
 class MoTypes(IntEnum):
     UNDEFINED = 0
     DIS = 1
@@ -27,8 +26,6 @@ class MoTypes(IntEnum):
     SPT = 9
     
     
-
-
 class Droplet():
     """ Biochip Droplet Class """
     droplet_count = 0
@@ -61,7 +58,6 @@ class Droplet():
         return
     
     
-    
 def showIsGPU():
     import tensorflow as tf
     if tf.test.is_gpu_available():
@@ -70,7 +66,28 @@ def showIsGPU():
         print("\n\n\n##### Training on CPUs... #####\n")
     return
 
-# class Biochip():
-#     """ MEDA Biochip State Class """
-#     def __init__(self) -> None:
-#         pass
+
+def showIsGPU(tf):
+    if tf.test.is_gpu_available():
+        print("\n\n\n##### Training on GPUs... #####\n")
+    else:
+        print("\n\n\n##### Training on CPUs... #####\n")
+    return
+
+
+class LearningRateSchedule(Schedule):
+    def __init__(self, base_rate=2.5e-4):
+        self.base_rate:float = float(base_rate)
+        return
+    
+    def value(self, frac):
+        return self.linearDecayValue(frac)
+    
+    def linearDecayValue(self, frac):
+        lr_now = float(frac) * self.base_rate
+        return lr_now
+
+
+# def learningRate(frac:float):
+    
+#     return

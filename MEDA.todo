@@ -5,12 +5,39 @@
 'Alt+S' // Triggers `Todo: Toggle Start`
 'Cmd/Ctrl+Shift+A' // Triggers  `Todo: Archive`
 
+# x = _info[3]['terminal_observation']
+
+from stable_baselines import results_plotter
+log_dir = "/home/elfar/MEDA/a_log/"
+results_plotter.plot_results([log_dir], 1e5, results_plotter.X_TIMESTEPS, "MEDA")
+plt.draw()
+plt.savefig('a_log/_Plot.png')
+
 MEDA.MASTER:
+    A. Verify results for other configurations:
+        ☐ 
+
+
+MEDA.PROBLEMS:
+    Investigate Points discussed with Qitong:
+         ☐ Verify that we use deterministic actions
+         ☐ 
+
+    Implement Learning Rate Scheduler:
+        ✔ Check the schedules package @done(21-08-12 12:22)
+        ✔ Implement decaying rate @done(21-08-12 12:22)
+        
+    Apply New Observation for Illegal Moves:
+        ✔ Create flag variable @done(21-08-07 07:37)
+        ✔ Reset flags in reset() @done(21-08-07 08:00)
+        ✔ Set flags in updatePosition() @done(21-08-07 08:00)
+        ☐ Add to observation in updatePosition()
+    Wrapping Up:
+        ☐ Run test 0729a
+            15x15, nps=32, init=(3,3), end=(8,11)
     Steps for debugging:
         ✔ Examine the behavior of the bugs @done(21-07-26 21:49)
         ☐ Test with manhatten distance
-
-
     ☐ Final Testing
         ✔ Test a very small policy step @done(21-07-26 11:28)
             Fast convergence

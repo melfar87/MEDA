@@ -55,6 +55,60 @@ class SomeModule:
     # else:
     #     raise RuntimeError(
     #         'Unknown mode in render')
+    
+    
+                # x0,y0,x1,y1 = self.droplet
+            # probN, probS, probE, probW = 0, 0, 0, 0
+            # if moveN:
+            #     if dr[3] < y_max:
+            #         frontSetN = self.m_pattern[max(dr[0]-1,0):dr[2]+1,dr[3]]
+            #         degraSetN = self.m_degradation[max(dr[0]-1,0):dr[2]+1,dr[3]]
+            #         frontN = frontSetN.sum()
+            #         # frontN = self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum() #[BUG#0002]
+            #         if frontN > 0:
+            #             probN = (np.dot(frontSetN, degraSetN) / frontN)
+            #             # probN = (
+            #             #     np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[3]],
+            #             #         self.m_degradation[dr[0]-1:dr[2]+1,dr[3]]) /
+            #             #     frontN )
+            #         else:
+            #             probN = 0
+            #     moveN = ( random.random() <= probN )
+            # elif moveS:
+            #     if dr[1] > y_min:
+            #         frontS = self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1].sum()
+            #         if frontS > 0:
+            #             probS = (
+            #                 np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1],
+            #                     self.m_degradation[dr[0]-1:dr[2]+1,dr[1]-1]) /
+            #                 frontS )
+            #         else:
+            #             probS = 0
+            #     moveS = ( random.random() <= probS )
+            # if moveE:
+            #     if dr[2] < x_max:
+            #         frontSetE = self.m_pattern[dr[2],max(dr[1]-1,0):dr[3]+1]
+            #         degraSetE = self.m_degradation[dr[2],max(dr[1]-1,0):dr[3]+1]
+            #         frontE = frontE.sum()
+            #         if frontE > 0:
+            #             probE = (
+            #                 np.dot(self.m_pattern[dr[2],dr[1]-1:dr[3]+1],
+            #                     self.m_degradation[dr[2],dr[1]-1:dr[3]+1]) /
+            #                 frontE )
+            #         else:
+            #             probE = 0
+            #     moveE = ( random.random() <= probE )
+            # elif moveW:
+            #     if dr[0] > x_min:
+            #         frontW = self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1].sum()
+            #         if frontW > 0:
+            #             probW = (
+            #                 np.dot(self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1],
+            #                     self.m_degradation[dr[0]-1,dr[1]-1:dr[3]+1]) /
+            #                 frontW )
+            #         else:
+            #             probW = 0
+            #     moveW = ( random.random() <= probW )
         
 
     def printHealthSatus(self):

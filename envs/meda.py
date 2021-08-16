@@ -2,6 +2,8 @@ import copy
 import random
 import numpy as np
 from enum import IntEnum
+# import matplotlib
+# matplotlib.use('WebAgg')
 import matplotlib.pyplot as plt
 
 import gym
@@ -17,16 +19,27 @@ import cv2
 #     WW = 3  # West
     
 
+# class Direction(IntEnum):
+#     ZZ = 0  # Sleep/Stop
+#     NN = 1  
+#     NE = 2  
+#     EE = 3  
+#     SE = 4  
+#     SS = 5  
+#     SW = 6  
+#     WW = 7  
+#     NW = 8
+    
 class Direction(IntEnum):
-    ZZ = 0  # Sleep/Stop
-    NN = 1  
-    NE = 2  
-    EE = 3  
-    SE = 4  
-    SS = 5  
-    SW = 6  
-    WW = 7  
-    NW = 8  
+    NN = 0 
+    NE = 1 
+    EE = 2 
+    SE = 3 
+    SS = 4 
+    SW = 5 
+    WW = 6 
+    NW = 7    
+
 
 
 class MEDAEnv(gym.Env):
@@ -79,6 +92,7 @@ class MEDAEnv(gym.Env):
         self.xs0range = [3,]
         self.ys0range = [1,3,]
         self.act_count = np.zeros(9)
+        self.action = Direction(0)
         
         # State vars
         self.droplet = np.zeros(4, dtype=np.int)
@@ -93,20 +107,23 @@ class MEDAEnv(gym.Env):
         self.m_pattern = np.zeros((width, height), dtype=np.uint8)
         self.step_count = 0
         self.max_step = 0
+        self.violation_count = 0
+        self.collision = np.zeros(4, dtype=np.bool)
 
         # Gym environment: rewards and action space
-        self.reward_range = (-100.0, 1.0)
+        self.reward_range = (-1000.0, 1000.0)
         self.action_space = spaces.Discrete(len(self.actions))
         if b_use_dict:
-            self.observation_space = spaces.Dict({
-                'health': spaces.Box(
-                    low=0, high=2**n_bits-1,
-                    shape=(width, height, 1), dtype=np.uint8),
-                'sensors': spaces.Box(
-                    low=0, high=1,
-                    shape=(width, height), dtype=np.uint8)
-            })
-            self.keys = list(self.observation_space.spaces.keys())
+            # self.observation_space = spaces.Dict({
+            #     'health': spaces.Box(
+            #         low=0, high=2**n_bits-1,
+            #         shape=(width, height, 1), dtype=np.uint8),
+            #     'sensors': spaces.Box(
+            #         low=0, high=1,
+            #         shape=(width, height), dtype=np.uint8)
+            # })
+            # self.keys = list(self.observation_space.spaces.keys())
+            raise NotImplemented("Dictionary-based observation not implemented")
         else:
             self.n_layers = 3
             self.goal_layer_id = 0
@@ -165,6 +182,7 @@ class MEDAEnv(gym.Env):
             obs: Observation
         """
         self.step_count = 0
+        self.violation_count = 0
         self._resetActuationMatrix(is_random=False)
         self._resetInitialState()
         self._resetInitialHealth()
@@ -182,6 +200,7 @@ class MEDAEnv(gym.Env):
             obs: Observation
         """
         self.step_count = 0
+        # [FIXME] Review what needs to be reset
         
         self.droplet = copy.deepcopy(dr_s)
         self.goal = copy.deepcopy(dr_g)
@@ -198,7 +217,8 @@ class MEDAEnv(gym.Env):
             min(max(self.goal[3],self.droplet[3])+3,self.height)
         )
         # Set the max number of steps allowed
-        self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
+        # self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
+        self.max_step = 2*(self.width+self.height)
         
         self._updateHealth()
         obs = self._getObs()
@@ -220,6 +240,7 @@ class MEDAEnv(gym.Env):
                 )
         """
         self.act_count[action] += 1
+        self.action = Direction(action)
         
         # Keyboard debouncing in play mode
         if self.b_play_mode:
@@ -249,6 +270,7 @@ class MEDAEnv(gym.Env):
         self.step_count += 1
         prev_dist = self._getDistanceToGoal()
         b_is_valid = self._updatePattern(action)
+        if b_is_valid==False: self.violation_count += 1 
         self.dr_path.append(copy.deepcopy(self.droplet))
         curr_dist = self._getDistanceToGoal()
         self.m_actcount += self.m_pattern
@@ -257,10 +279,155 @@ class MEDAEnv(gym.Env):
         
         # reward, b_at_goal, done = self._getRewardA(
         #     b_is_valid=b_is_valid, prev_dist=prev_dist, curr_dist=curr_dist)
-        reward, b_at_goal, done = self._getRewardB(
+        reward, b_at_goal, done = self._getRewardH(
             b_is_valid=b_is_valid, prev_dist=prev_dist, curr_dist=curr_dist)
             
         return obs, reward, done, {"b_at_goal":b_at_goal, "num_cycles":self.step_count}
+
+
+    def _getRewardH(self, b_is_valid, prev_dist, curr_dist):
+        done = False
+        b_at_goal = 0
+        reward = 0.0
+        abs_dist = curr_dist
+        if self._isComplete():
+            reward += 100.0 #+ 0.5*(prev_dist-curr_dist)
+            b_at_goal = 100
+            done = True
+        else:
+            # reward += 1.0/abs_dist**2 - 0.2
+            reward = 0.0
+            
+        if curr_dist < prev_dist:
+            reward += 0.5*(prev_dist-curr_dist)
+        else:
+            reward += 0.8*(prev_dist-curr_dist) - 1.0
+            
+        if self.step_count > self.max_step:
+            reward += 0 
+            done = True
+            
+        if b_is_valid == False: #action == Direction.ZZ: # penalize stopping
+            reward += -1.0
+            
+        return reward, b_at_goal, done
+
+    def _getRewardG(self, b_is_valid, prev_dist, curr_dist):
+        done = False
+        b_at_goal = 0
+        reward = 0.0
+        abs_dist = curr_dist
+        if self._isComplete():
+            reward += 100.0 #+ 0.5*(prev_dist-curr_dist)
+            b_at_goal = 100
+            done = True
+        else:
+            # reward += 1.0/abs_dist**2 - 0.2
+            reward = 0.0
+            
+        if curr_dist < prev_dist:
+            reward += 0.5
+        else:
+            reward += -0.8
+            
+        if self.step_count > self.max_step:
+            reward += 0 
+            done = True
+            
+        if b_is_valid == False: #action == Direction.ZZ: # penalize stopping
+            reward += -100.0
+            
+        return reward, b_at_goal, done
+
+    def _getRewardF(self, b_is_valid, prev_dist, curr_dist):
+        """ Works well but does not optimize distance """
+        done = False
+        b_at_goal = 0
+        reward = 0.0
+        abs_dist = curr_dist
+        if self._isComplete():
+            reward += 100.0 #+ 0.5*(prev_dist-curr_dist)
+            b_at_goal = 100
+            done = True
+        else:
+            # reward += 1.0/abs_dist**2 - 0.2
+            reward = 0.0
+            
+        if curr_dist < prev_dist:
+            reward += 1
+            
+        if self.step_count > self.max_step:
+            reward += 0 
+            done = True
+            
+        if b_is_valid == False: #action == Direction.ZZ: # penalize stopping
+            reward -= 0.0
+            
+        return reward, b_at_goal, done
+
+
+    def _getRewardE(self, b_is_valid, prev_dist, curr_dist):
+        done = False
+        b_at_goal = 0
+        reward = 0.0
+        abs_dist = curr_dist
+        if self._isComplete():
+            reward += 100.0 #+ 0.5*(prev_dist-curr_dist)
+            b_at_goal = 100
+            done = True
+        else:
+            # reward += 1.0/abs_dist**2 - 0.2
+            reward = 0.0
+            
+        # if curr_dist < prev_dist:
+        #     reward += 0.1
+            
+        if self.step_count > self.max_step:
+            reward += 0 
+            done = True
+            
+        if b_is_valid == False: #action == Direction.ZZ: # penalize stopping
+            reward -= 1.0
+            
+        return reward, b_at_goal, done
+
+    def _getRewardD(self, b_is_valid, prev_dist, curr_dist):
+        done = False
+        b_at_goal = 0
+        abs_dist = curr_dist
+        if self._isComplete():
+            reward = 100.0 #+ 0.5*(prev_dist-curr_dist)
+            b_at_goal = 100
+            done = True
+        elif self.step_count > self.max_step:
+            reward = 0.5/abs_dist**2 - 0.5
+            done = True
+        elif b_is_valid == False: #action == Direction.ZZ: # penalize stopping
+            reward = 0.5/abs_dist**2 - 0.5 - 0.5 # self.violation_count**2
+            # if self.violation_count > 5:
+            #    done = True
+        else:
+            reward = 1.0/abs_dist**2 - 0.5
+        return reward, b_at_goal, done
+
+    def _getRewardC(self, b_is_valid, prev_dist, curr_dist):
+        done = False
+        b_at_goal = 0
+        abs_dist = curr_dist
+        if self._isComplete():
+            reward = 100.0 #+ 0.5*(prev_dist-curr_dist)
+            b_at_goal = 100
+            done = True
+        elif self.step_count > self.max_step:
+            reward = 0.5/abs_dist**2 - 100.0
+            done = True
+        elif b_is_valid == False: #action == Direction.ZZ: # penalize stopping
+            reward = 0.5/abs_dist**2 - 1.0 - 0.5 # self.violation_count**2
+            # if self.violation_count > 5:
+            #    done = True
+        else:
+            reward = 1.0/abs_dist**2 - 1.0
+        return reward, b_at_goal, done
 
     def _getRewardB(self, b_is_valid, prev_dist, curr_dist):
         done = False
@@ -395,7 +562,11 @@ class MEDAEnv(gym.Env):
     def _getDistanceToGoal(self):
         # [NOTE] Use L2 norm instead of this mess
         # dist = np.mean(np.abs(self.goal - self.droplet))
-        dist = np.linalg.norm(self.goal[0:2] - self.droplet[0:2])
+        # Ecludian distance
+        # dist = np.linalg.norm(self.goal[0:2] - self.droplet[0:2])
+        # Manhatten distance
+        dist = np.abs(self.goal[0]-self.droplet[0]) + \
+            np.abs(self.goal[1]-self.droplet[1])
         return dist
     
     def _getManhattenToGoal(self):
@@ -409,27 +580,42 @@ class MEDAEnv(gym.Env):
         initialization and reset.
         """
         # [DONE] Implement random dr_0 and dr_g generator based on size
+        
         # Randomly select droplet size first
         dr_width, dr_height = random.choice(self.droplet_sizes)
-        # [NOTE][2021-07-25] This was replaced by full range
-        # xs0 = random.choice(self.xs0range)
-        # ys0 = random.choice(self.ys0range)
-        xs0 = random.randint(0+2,self.width-dr_width-2)
-        ys0 = random.randint(0+2,self.height-dr_height-2)
-        # Droplet range includes mins and excludes maxs
-        xs1 = xs0 + dr_width
-        ys1 = ys0 + dr_height
-        self.droplet = np.array((xs0,ys0,xs1,ys1))
         
         # Randomly generate goal state
         # [NOTE][2021-07-25] This was replaced by the full range
         # xg0 = random.randint(1,self.width-dr_width)
         # yg0 = random.randint(1,np.min((xg0,self.height-dr_height)))
-        xg0 = random.randint(0+2,self.width-dr_width-2)
-        yg0 = random.randint(0+2,self.height-dr_height-2)
+        # xg0 = random.randint(0,4) #self.width-dr_width)
+        # yg0 = random.randint(0,4) #self.height-dr_height)
+        xg0 = 0
+        yg0 = 0
         xg1 = xg0 + dr_width
         yg1 = yg0 + dr_height
-        self.goal[:] = (xg0,yg0,xg1,yg1)
+        # self.goal[:] = (xg0,yg0,xg1,yg1)
+        self.goal = np.array((xg0,yg0,xg1,yg1))
+        
+        # Randomly generate droplet state
+        # [NOTE][2021-07-25] This was replaced by full range
+        # xs0 = random.choice(self.xs0range)
+        # ys0 = random.choice(self.ys0range)
+        
+        # b_tmp_at_goal = True
+        # while b_tmp_at_goal: # prevents starting at goal
+        #     xs0 = random.randint(0,self.width-dr_width)
+        #     ys0 = random.randint(0,self.height-dr_height)
+        #     b_tmp_at_goal = (xs0==xg0) and (ys0==yg0)
+        xs0 = random.randint(self.width-dr_width-2, self.width-dr_width)
+        ys0 = random.randint(self.height-dr_height-2, self.height-dr_height)
+        
+        # Droplet range includes mins and excludes maxs
+        xs1 = xs0 + dr_width
+        ys1 = ys0 + dr_height
+        self.droplet = np.array((xs0,ys0,xs1,ys1))
+        
+        
         
         # Compute hazard bounds
         self.hazard[:] = (
@@ -440,7 +626,11 @@ class MEDAEnv(gym.Env):
         )
         
         # Set the max number of steps allowed
-        self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
+        # self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
+        self.max_step = 1*(self.width+self.height)
+        
+        self.collision.fill(False)
+        self.action = Direction(0)
         
         # [TODO] Remove agt_sta and disable old router
         # self.agt_sta = copy.deepcopy(self.droplet)
@@ -518,10 +708,15 @@ class MEDAEnv(gym.Env):
         elif action == Direction.SW and y0 > y_min and x0 > x_min:
             tmpShift = [-1,-1,-1,-1]
             moveS, moveW = True, True
-        elif action == Direction.ZZ:
-            tmpShift = [ 0, 0, 0, 0]
-            tmpFront = [1,]
+        # elif action == Direction.ZZ:
+        #     tmpShift = [ 0, 0, 0, 0]
+        #     tmpFront = [1,]
+        #     b_is_valid = False
         else:
+            self.collision[0] = (x0==x_min) and (action in {Direction.SW,Direction.WW,Direction.NW})
+            self.collision[1] = (y0==y_min) and (action in {Direction.SE,Direction.SS,Direction.SW})
+            self.collision[2] = (x1==x_max) and (action in {Direction.NE,Direction.EE,Direction.SE})
+            self.collision[3] = (y1==y_max) and (action in {Direction.NW,Direction.NN,Direction.NE})
             tmpShift = [ 0, 0, 0, 0]
             tmpFront = [1,]
             b_is_valid = False
@@ -543,9 +738,9 @@ class MEDAEnv(gym.Env):
             tmpDr = self.droplet + tmpShift # New droplet location
         # self.m_prev_pattern = np.copy(self.m_pattern)
         # Correct tmpDr if needed
-        if   tmpDr[0] < x_min: tmpDr[[0,2]] -= x_min - tmpDr[[0,0]]
+        if   tmpDr[0] < x_min: tmpDr[[0,2]] += x_min - tmpDr[[0,0]] #[BUG#0001]
         elif tmpDr[2] > x_max: tmpDr[[0,2]] -= tmpDr[[2,2]] - x_max
-        if   tmpDr[1] < y_min: tmpDr[[1,3]] -= y_min - tmpDr[[1,1]]
+        if   tmpDr[1] < y_min: tmpDr[[1,3]] += y_min - tmpDr[[1,1]] #[BUG#0001]
         elif tmpDr[3] > y_max: tmpDr[[1,3]] -= tmpDr[[3,3]] - y_max
         # Reset pattern, np.array.fill is faster than [:,:] = 0
         self.m_pattern.fill(0)
@@ -559,65 +754,42 @@ class MEDAEnv(gym.Env):
             probN, probS, probE, probW = 0, 0, 0, 0
             if moveN:
                 if dr[3] < y_max:
-                    frontN = self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum()
-                    if frontN > 0:
-                        probN = (
-                            np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[3]],
-                                self.m_degradation[dr[0]-1:dr[2]+1,dr[3]]) /
-                            frontN )
-                    else:
-                        probN = 0
+                    frontSetN = self.m_pattern[max(dr[0]-1,0):dr[2]+1,dr[3]]
+                    degraSetN = self.m_degradation[max(dr[0]-1,0):dr[2]+1,dr[3]]
+                    frontN = frontSetN.sum() #[BUG#0002]
+                    # frontN = self.m_pattern[dr[0]-1:dr[2]+1,dr[3]].sum()
+                    if frontN > 0: probN = (np.dot(frontSetN, degraSetN) / frontN)
+                    else: probN = 0
                 moveN = ( random.random() <= probN )
             elif moveS:
                 if dr[1] > y_min:
-                    frontS = self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1].sum()
-                    if frontS > 0:
-                        probS = (
-                            np.dot(self.m_pattern[dr[0]-1:dr[2]+1,dr[1]-1],
-                                self.m_degradation[dr[0]-1:dr[2]+1,dr[1]-1]) /
-                            frontS )
-                    else:
-                        probS = 0
+                    frontSetS = self.m_pattern[max(dr[0]-1,0):dr[2]+1,dr[1]-1]
+                    degraSetS = self.m_degradation[max(dr[0]-1,0):dr[2]+1,dr[1]-1]
+                    frontS = frontSetS.sum()
+                    if frontS > 0: probS = (np.dot(frontSetS, degraSetS) / frontS)
+                    else: probS = 0
                 moveS = ( random.random() <= probS )
             if moveE:
                 if dr[2] < x_max:
-                    frontE = self.m_pattern[dr[2],dr[1]-1:dr[3]+1].sum()
-                    if frontE > 0:
-                        probE = (
-                            np.dot(self.m_pattern[dr[2],dr[1]-1:dr[3]+1],
-                                self.m_degradation[dr[2],dr[1]-1:dr[3]+1]) /
-                            frontE )
-                    else:
-                        probE = 0
+                    frontSetE = self.m_pattern[dr[2],max(dr[1]-1,0):dr[3]+1]
+                    degraSetE = self.m_degradation[dr[2],max(dr[1]-1,0):dr[3]+1]
+                    frontE = frontSetE.sum()
+                    if frontE > 0: probE = (np.dot(frontSetE, degraSetE) / frontE)
+                    else: probE = 0
                 moveE = ( random.random() <= probE )
             elif moveW:
                 if dr[0] > x_min:
-                    frontW = self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1].sum()
-                    if frontW > 0:
-                        probW = (
-                            np.dot(self.m_pattern[dr[0]-1,dr[1]-1:dr[3]+1],
-                                self.m_degradation[dr[0]-1,dr[1]-1:dr[3]+1]) /
-                            frontW )
-                    else:
-                        probW = 0
+                    frontSetW = self.m_pattern[dr[0]-1,max(dr[1]-1,0):dr[3]+1]
+                    degraSetW = self.m_degradation[dr[0]-1,max(dr[1]-1,0):dr[3]+1]
+                    frontW = frontSetW.sum()
+                    if frontW > 0: probW = (np.dot(frontSetW, degraSetW) / frontW)
+                    else: probW = 0
                 moveW = ( random.random() <= probW )
+            # Move droplet
             if moveN: dr += [ 0,+1, 0,+1]
             if moveS: dr += [ 0,-1, 0,-1]
             if moveE: dr += [+1, 0,+1, 0]
             if moveW: dr += [-1, 0,-1, 0]
-
-        # Update position
-        # if self.b_degrade:
-        #     prob = np.mean(tmpFront)
-        # else:
-        #     prob = 1
-        # # Draw a sample from the bernolli distribution Bern(prob)
-        # if random.random() <= prob:
-        #     # Random sample is True
-        #     self.droplet += tmpShift
-        # else:
-        #     # Random sample is False
-        #     pass
         
         return b_is_valid
         
@@ -647,6 +819,15 @@ class MEDAEnv(gym.Env):
         # Droplet layer
         x0,y0,x1,y1 = self.droplet
         obs[x0:x1,y0:y1,self.droplet_layer_id] = 1
+        # Collision
+        if self.collision[0]:
+            obs[x0,y0:y1,self.droplet_layer_id] = 0.5
+        if self.collision[1]: 
+            obs[x0:x1,y0,self.droplet_layer_id] = 0.5
+        if self.collision[2]:
+            obs[x1-1,y0:y1,self.droplet_layer_id] = 0.5
+        if self.collision[3]:
+            obs[x0:x1,y1-1,self.droplet_layer_id] = 0.5
         # Health layer, this leaves health values outside hazard bounds as 0s
         x0,y0,x1,y1 = self.hazard
         obs[x0:x1,y0:y1,self.health_layer_id] = self.m_health[x0:x1,y0:y1]

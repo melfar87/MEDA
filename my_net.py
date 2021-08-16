@@ -9,13 +9,13 @@ from stable_baselines.common.policies import ActorCriticPolicy
 def myCnn(scaled_images, **kwargs):
     activ = tf.nn.relu
     layer1 = activ(conv(scaled_images, 'c1',
-            n_filters = 32, filter_size = 3,
+            n_filters = 64, filter_size = 3,
             stride = 1, pad = 'SAME', **kwargs))
     layer2 = activ(conv(layer1, 'c2',
-            n_filters = 64, filter_size = 3,
+            n_filters = 128, filter_size = 3,
             stride = 1, pad = 'SAME', **kwargs))
     layer3 = activ(conv(layer2, 'c3',
-            n_filters = 64, filter_size = 3,
+            n_filters = 128, filter_size = 3,
             stride = 1, pad = 'SAME', **kwargs))
     layer3 = conv_to_fc(layer3)
     return activ(linear(layer3, 'fc1',
@@ -39,14 +39,26 @@ class MyCnnPolicy(ActorCriticPolicy):
                 self.pdtype.proba_distribution_from_latent(pi_latent, vf_latent, init_scale=0.01)
         self._setup_init()
 
-    def step(self, obs, state=None, mask=None, deterministic=False):
+    def step(self, obs, state=None, mask=None, deterministic=False, randomize=False):
         if deterministic:
-            action, value, neglogp = self.sess.run([self.deterministic_action, self.value_flat, self.neglogp],
-                                                   {self.obs_ph: obs})
+            action, value, neglogp = self.sess.run(
+                [self.deterministic_action, self.value_flat, self.neglogp], {self.obs_ph: obs})
+        elif randomize:
+            action, value, neglogp = self.sess.run(
+                [self.action, self.value_flat, self.neglogp], {self.obs_ph: obs})
         else:
-            action, value, neglogp = self.sess.run([self.action, self.value_flat, self.neglogp],
-                                                   {self.obs_ph: obs})
+            action, value, neglogp = self.sess.run(
+                [self.action, self.value_flat, self.neglogp], {self.obs_ph: obs})
         return action, value, self.initial_state, neglogp
+    
+    # def step(self, obs, state=None, mask=None, deterministic=False, randomize=False):
+    #     if deterministic:
+    #         action, value, neglogp = self.sess.run([self.deterministic_action, self.value_flat, self.neglogp],
+    #                                                {self.obs_ph: obs})
+    #     else:
+    #         action, value, neglogp = self.sess.run([self.action, self.value_flat, self.neglogp],
+    #                                                {self.obs_ph: obs})
+    #     return action, value, self.initial_state, neglogp
 
     def proba_step(self, obs, state=None, mask=None):
         return self.sess.run(self.policy_proba, {self.obs_ph: obs})

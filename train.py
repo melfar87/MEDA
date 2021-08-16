@@ -1,29 +1,17 @@
 #!/usr/bin/python
 
+from meda_utils import LearningRateSchedule, showIsGPU
 import sys, argparse
 import os
 import time
 import datetime
 import pickle
-
 from matplotlib.pyplot import pause
 import matplotlib.animation as animation
+import stable_baselines
 
-# from utils import *
 
-def main(args):
-    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
-    # b_backup_model = True
-    # t0s = time.time()
-    # Sizes are (width, height)
-    # sizes = [(30,30),]
-    # for s in sizes:
-    #     args = {'width': s[1], 'height': s[0],
-    #             'n_modules': 0,
-    #             'b_degrade': True,
-    #             'per_degrade': 0.1}
-    # expSeveralRuns(args, n_envs=8, n_policysteps=64, n_experiments=1)
-    
+def main(args):    
     t_total_s = time.time()
     expSeveralRuns(args)
     t_total_e = time.time()
@@ -50,8 +38,9 @@ def legacyReward(env, b_path = False):
     return router.getReward(b_path)
 
 
-def EvaluatePolicy(model, env,
-        n_eval_episodes = 100, b_path = False, render=False):
+def EvaluatePolicy(model:stable_baselines.ppo2.PPO2, env,
+        n_eval_episodes = 100, b_path = False, render=False,
+        b_stable=False):
     # t_eval_s = time.time()
     episode_rewards = np.zeros(n_eval_episodes)
     legacy_rewards = np.zeros(n_eval_episodes)
@@ -80,6 +69,9 @@ def EvaluatePolicy(model, env,
                 num_cycles[episode_count] = _info[env_id]["num_cycles"]
                 # Reset respective environment
                 episode_reward[env_id] = 0
+                # Check for errors
+                if b_stable and reached_goal[episode_count] < 100:
+                    print("Failed at %03d-%d" % (episode_count,env_id))
                 # Increment no. of episodes, break if no more episodes are needed
                 episode_count+=1
                 if episode_count >= n_eval_episodes: break
@@ -90,15 +82,8 @@ def EvaluatePolicy(model, env,
     mean_cycles = num_cycles.mean()
     # t_eval_e = time.time()
     # print("      Eval took %d seconds" % (t_eval_e-t_eval_s))
+    obs = env.reset() # Resets environment
     return mean_reward, mean_legacy, mean_goal, mean_cycles
-
-
-def showIsGPU():
-    if tf.test.is_gpu_available():
-        print("\n\n\n##### Training on GPUs... #####\n")
-    else:
-        print("\n\n\n##### Training on CPUs... #####\n")
-    return
 
 
 def plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size,
@@ -150,14 +135,18 @@ def plotAgentPerformance(a_rewards, a_goals, a_cycles, str_size,
 
 
 def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
-                    n_policysteps=128, b_path=False, exp_id=0):
+                    n_policysteps=128, b_path=False, exp_id=0, n_evals=100):
     """Run single experiment consisting of a number of episodes
     """
+    lr_schedule = LearningRateSchedule(base_rate=2.5e-4)
     if model is None:
-        model = PPO2(MyCnnPolicy, env, n_steps=n_policysteps)
+        model = PPO2(policy=MyCnnPolicy, env=env, n_steps=n_policysteps,
+                     learning_rate=lr_schedule.value,
+                     verbose=0)
 
     agent_rewards, old_rewards, episodes = [], [], []
     episode_times, reach_goals, mean_cycles = [], [], []
+    b_stable = False
     
     print("+-----------------------------------------------------------------+")
     #     "INFO: Epoch   0    4/  30 sec   -58.630 rew   49.0 suc   49.4 cyc")
@@ -165,11 +154,20 @@ def runAnExperiment(env, model=None, n_epochs=50, n_total_timesteps=20000,
         print("|",end=""), sys.stdout.flush()
         t2s = time.time()
         # print("INFO: Epoch %2d started" % i)
+        
+        # Learn
         model.learn(total_timesteps=n_total_timesteps)
+        
         t_eval_s = time.time()
+        
+        # Evaluate
         mean_reward, legacy_reward, reach_goal, mean_cycle = \
-            EvaluatePolicy(model, model.get_env(), n_eval_episodes=100,
-                           b_path=b_path, render=False)
+            EvaluatePolicy(model, model.get_env(), n_eval_episodes=n_evals,
+                           b_path=b_path, render=False, b_stable=b_stable)
+        if reach_goal == 100:
+            b_stable = True
+            lr_schedule.base_rate = lr_schedule.base_rate * 0.1
+            # model.learning_rate = lr_schedule
         t_eval_e = time.time()
         t_eval = t_eval_e - t_eval_s
         agent_rewards.append(mean_reward)
@@ -284,6 +282,7 @@ def expSeveralRuns(args):
     n_envs = args.n_envs
     n_epochs = args.n_epochs
     n_total_timesteps = args.n_total_timesteps
+    n_evals = args.n_evals
     b_save_model = args.b_save_model
     str_load_model = args.s_load_model
     str_model_name = args.s_model_name
@@ -294,8 +293,18 @@ def expSeveralRuns(args):
     if sys.platform != 'win32':
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1.0,allow_growth=True)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    env = make_vec_env(MEDAEnv,wrapper_class=None,n_envs=n_envs,env_kwargs=vars(args))
-    showIsGPU()
+    
+    if int(str(args.verbose)[1]) > 0:    
+        log_dir = "/home/elfar/MEDA/a_log/"
+        os.makedirs(log_dir, exist_ok=True)
+    else:
+        log_dir = None
+    
+    env = make_vec_env(MEDAEnv,
+                       monitor_dir=log_dir,
+                       wrapper_class=None,n_envs=n_envs,env_kwargs=vars(args))
+    
+    showIsGPU(tf)
     
     # Initialize agent and old rewards
     a_rewards, a_goals, o_rewards, a_cycles = [], [], [], []
@@ -312,7 +321,7 @@ def expSeveralRuns(args):
     os.system('cls' if os.name == 'nt' else 'clear')
     
     if str_mode == 'train':
-        print("### TRAIN ### " + getTimeStamp() + " ###")
+        print("\n\n### TRAIN ### " + getTimeStamp() + " ### " + args.s_description)
         print("+=================================================================+")
         print("|            ID          Time       Rewards    Success     Cycles |")
         # Run Experiments
@@ -320,7 +329,7 @@ def expSeveralRuns(args):
             a_r, o_r, episodes, a_g, a_c, model = runAnExperiment(
                 env, model=loaded_model, n_epochs=n_epochs,
                 n_total_timesteps=n_total_timesteps, n_policysteps=n_policysteps,
-                exp_id=i
+                exp_id=i, n_evals=n_evals
             )
             a_rewards.append(a_r)
             a_goals.append(a_g)
@@ -366,25 +375,26 @@ if __name__ == '__main__':
     # List of args default values
     def_args = {
         'seed':              -1,
-        'verbose':           '3',
+        'verbose':           '00', # (TF|Monitor)
         's_mode':            'train', # train | test
+        's_model_name':      '0816a',
         'size':              (30,30),
         'obs_size':          (30,30),
+        's_description':     's30/o30 Fix SG, R E, Col., LR Sc, NPS4, TT14 x',
         'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':            8,
-        'n_policysteps':     32, # [NOTE][2021-07-25] Was 32
+        'n_policysteps':     8, # [NOTE][2021-07-25] Was 32
         'n_exps':            1,
         'n_epochs':          50,
         'n_total_timesteps': 2**14,
         'b_save_model':      True,
-        's_model_name':      '0726c',
-        's_suffix':          'NPS32', #'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
-        's_load_model':      '', #'0726b_030x030_E050_NPS16_00', #'TMP_E_030x030_E040__00',#'TMP_D_030x030_E025_T30V300TL_D22_00', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
-        'b_play_mode':       True,
+        's_suffix':          'NPS04', #'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
+        's_load_model':      '',#'0727a_030x030_E010_NPS32_00', #'0726b_030x030_E050_NPS16_00', #'TMP_E_030x030_E040__00',#'TMP_D_030x030_E025_T30V300TL_D22_00', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
+        'b_play_mode':       False,
         'deg_mode':          'normal',
         'deg_perc':          0.2,
         'deg_size':          2,
-        'description':       'Full random initial state'
+        'n_evals':           500
     }
     
     # Initialize parser
@@ -408,9 +418,11 @@ if __name__ == '__main__':
     parser.add_argument('--deg-mode',type=str,default=def_args['deg_mode'])
     parser.add_argument('--deg-perc',type=float,default=def_args['deg_perc'])
     parser.add_argument('--deg-size',type=int,default=def_args['deg_size'])
+    parser.add_argument('--n-evals',type=int,default=def_args['n_evals'])
+    parser.add_argument('--s-description',type=str,default=def_args['s_description'])
     args = parser.parse_args()
     
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = args.verbose
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(args.verbose)[0]
     import warnings
     warnings.filterwarnings("ignore", message=r"Passing", category=FutureWarning)
     warnings.filterwarnings("ignore", message=r"The name")
@@ -426,8 +438,12 @@ if __name__ == '__main__':
     from stable_baselines.common import make_vec_env # tf_util
     # from stable_baselines.common.vec_env import DummyVecEnv
     # from stable_baselines.common.policies import MlpPolicy, CnnPolicy, MlpLstmPolicy
-    # from stable_baselines.common.evaluation import evaluate_policy
+    from stable_baselines.common.evaluation import evaluate_policy
     from stable_baselines import PPO2
+    
+    if int(str(args.verbose)[1]) > 0:
+        from stable_baselines.bench.monitor import Monitor, load_results
+        from stable_baselines import results_plotter
     # Set random seeds before starting for SB, Random, tensorflow, numpy, gym
     if args.seed >= 0:
         from stable_baselines.common.misc_util import set_global_seeds
