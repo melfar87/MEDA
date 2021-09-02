@@ -13,9 +13,67 @@ results_plotter.plot_results([log_dir], 1e5, results_plotter.X_TIMESTEPS, "MEDA"
 plt.draw()
 plt.savefig('a_log/_Plot.png')
 
+LIST:
+    0826a_030x030_E100_NPS64_00
+    
+
+MEDA.TODOLIST:
+    ✔ Understand the learning process @done(21-08-23 15:49)
+        ✔ Draw an outline of the learning @done(21-08-23 15:49)
+
+    ✔ Ensure fair distribution of RJs @done(21-08-29 11:20)
+        ✔ Create a variable at each reset @done(21-08-29 11:20)
+        ✔ Monitor the distribution @done(21-08-29 11:20)
+        ✔ Correct distribution accodingly @done(21-08-29 11:20)
+
+    ☐ Implement and test bioassay scheduler
+        ✔ Migrate args from test to test_bioassay @done(21-09-02 13:27)
+        ✔ Test simple bioassay using trained agent @done(21-09-02 18:57)
+        ✔ Implement separate routine for dispensing @done(21-09-02 18:57)
+    
+    ☐ Run bioassay experiments
+        ☐ Transfer learning for 60x30
+
+
+MEDA.RJ:
+    ☐ Prepare documents
+        ✔ PDF Entire manuscript @done(21-08-27 08:47)
+        ✔ LATEX Manuscript Latex softcopy @done(21-08-27 08:47)
+        ✔ PDF Figs + Tables with no captions @done(21-08-27 08:47)
+        ✔ PDF List of all figure and table captions in proper style @done(21-08-27 08:47)
+        ✔ Include Tung-Che biography @done(21-08-30 15:43)
+        ✔ Include Krish's photo @done(21-08-30 17:47)
+        ✔ Correct photo ratio @done(21-08-30 17:47)
+        ☐ Update Krish's bio
+        ☐ Update Miroslav's bio
+        ☐ Send out to everyone with comments
+        
+
+        ☐ PDF of each figure separately
+        ☐ Brief technical biography of each author + tiff photo
+
+MEDA.NOTES:
+    -- Increasing the number of minibatches was pivotal
+    -- Manually add padding is to be examined
+    -- Might need to consider a controlled random sampling of routing jobs
+    -- Neither learn() nor evaluate() resets the environment...
+        ✔ Reset the environment after each evaluation @done(21-08-20 09:00)
+            Reaches 100 at 72 (compared to 33) but seems more stable
+        ☐ Use a separate environment for evaluation
+
 MEDA.MASTER:
     A. Verify results for other configurations:
-        ☐ 
+        ☐ Verify for random routing jobs
+            ✔ Randomize initial state @done(21-08-19 10:26)
+            ✔ Obtain and examine results @done(21-08-19 10:26)
+            ✔ Randomize goal state @done(21-08-19 10:26)
+            ✔ Obtain and examine results @done(21-08-19 10:26)
+        
+        ☐ Verify for degradation modes
+            ☐ Reuse pre-trained policy network
+    
+    B. Hyperparameter tuning:
+        ☐ Change LR factor from 0.1 to 0.5
 
 
 MEDA.PROBLEMS:

@@ -1,7 +1,7 @@
 from enum import IntEnum
 import numpy as np
 from stable_baselines.common.schedules import Schedule
-
+import math
 
 
 class State(IntEnum):
@@ -84,7 +84,7 @@ class LearningRateSchedule(Schedule):
         return self.linearDecayValue(frac)
     
     def linearDecayValue(self, frac):
-        lr_now = float(frac) * self.base_rate
+        lr_now = math.sqrt(float(frac)) * self.base_rate
         return lr_now
 
 

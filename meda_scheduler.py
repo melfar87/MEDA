@@ -1,3 +1,4 @@
+from cv2 import DrawMatchesFlags_DRAW_OVER_OUTIMG
 from envs.meda import MEDAEnv
 import numpy as np
 from typing import List
@@ -40,23 +41,23 @@ class Mo():
         # [TODO] Implement Mo.createRoutingJobs()
         if self.s_type in {'Dis'}: # Dispense
             # No job required
-            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0])
+            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0], self)
             self.rj_list.append(rjObj)
         elif self.s_type in {'Out','Dsc'}:
-            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0])
+            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0], self)
             self.rj_list.append(rjObj)
         elif self.s_type in {'Mix','Dlt'}: # Mixing or Diluting
-            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0])
+            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0], self)
             self.rj_list.append(rjObj)
-            rjObj:Rj = Rj('J1', self.droplets[1], self.locations[0])
+            rjObj:Rj = Rj('J1', self.droplets[1], self.locations[0], self)
             self.rj_list.append(rjObj)
         elif self.s_type in {'Mag','Was','Thm'}:
-            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0])
+            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0], self)
             self.rj_list.append(rjObj)
         elif self.s_type in {'Spt'}: # Split
-            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0])
+            rjObj:Rj = Rj('J0', self.droplets[0], self.locations[0], self)
             self.rj_list.append(rjObj)
-            rjObj:Rj = Rj('J1', self.droplets[1], self.locations[0])
+            rjObj:Rj = Rj('J1', self.droplets[1], self.locations[0], self)
             self.rj_list.append(rjObj)
         else:
             raise Exception("Unknown type: %s" % self.s_type)
@@ -69,13 +70,14 @@ class Mo():
 class Rj():
     """ Routing Job Class """
     rj_count = 0
-    def __init__(self, s_name, dr_start, dr_goal) -> None:
+    def __init__(self, s_name, dr_start, dr_goal, parent=None) -> None:
         # super.__init__()
         self.id = Rj.rj_count
         Rj.rj_count += 1
         self.s_name = s_name
-        self.dr_droplet = dr_start
-        self.dr_goal = dr_goal
+        self.dr_droplet = np.array(dr_start)
+        self.dr_goal = np.array(dr_goal)
+        self.parent = parent
         self.hazard = np.zeros(4, dtype=np.int)
         self.b_show = False
         self.env_id = None
@@ -124,6 +126,7 @@ class MedaScheduler():
         self.rj_list:list[Rj] = []
         self.dr_list:list[Droplet] = []
         self.mo_dict = {}
+        self.dis_list:list[Rj] = [] # list of busy dispensing jobs
         return
     
     
@@ -252,6 +255,33 @@ class MedaScheduler():
         print(done)
         print(reward)
         print(action)
+        
+        # Process dispensing operations separately
+        rjObj:Rj
+        for rjObj in self.dis_list:
+            if not all(rjObj.dr_goal==rjObj.dr_droplet):
+                # perform action
+                if rjObj.dr_goal[0]!=rjObj.dr_droplet[0]:
+                    diff = rjObj.dr_goal[0] - rjObj.dr_droplet[0]
+                    step = (rjObj.dr_droplet[2] - rjObj.dr_droplet[2])*(diff//abs(diff))
+                    shift = min(diff,step//2,key=abs)
+                    rjObj.dr_droplet += [shift,0,shift,0]
+                elif rjObj.dr_goal[1]!=rjObj.dr_droplet[1]:
+                    diff = rjObj.dr_goal[1] - rjObj.dr_droplet[1]
+                    step = (rjObj.dr_droplet[3] - rjObj.dr_droplet[1])*(diff//abs(diff))
+                    shift = min(diff,step//2,key=abs)
+                    rjObj.dr_droplet += [0,shift,0,shift]
+                else:
+                    raise Exception("Something is wrong - aborting...")
+                
+                if all(rjObj.dr_goal==rjObj.dr_droplet):
+                    rjObj.b_is_done = True
+                
+            else:
+                rjObj.b_is_done = True
+        
+        # [FIXME] Remove dispensing jobs that are finished from self.dis_list
+        
         # moObj:Mo # typing
         # for moObj in self.mo_list:
         #     if moObj.state == State.BUSY:
@@ -274,6 +304,12 @@ class MedaScheduler():
     
     def _assignEnv(self, rjObj:Rj):
         """ Assigns and initializes the next available environment to RJ """
+        # Skip assignment if it is a dispensing operation
+        if rjObj.parent.s_type == 'Dis':
+            self.dis_list.append(rjObj)
+            return
+        
+        # Everything else: assign an evnironment
         env_idx = next(
             (i for i,v in enumerate(self.env_rj_ids) if v is None), None)
         if env_idx is None: raise Exception("Out of Enviromnets - Terminating")
@@ -336,6 +372,7 @@ class MedaScheduler():
     
 
     def _releaseEnv(self, rjObj:Rj):
+        if rjObj.parent.s_type == 'Dis': return
         self.env_rj_ids[rjObj.env_id] = None
         rjObj.env_id = None
         return
@@ -345,14 +382,17 @@ class MedaScheduler():
         pass
 
 
-    def _rjToEnv(self, rjObj:Rj, dr):
-        dr_env = dr + rjObj.tra_delta
-        if rjObj.tra_mirror_x:
-            dr_env[0] = self.width - dr_env[0]
-            dr_env[2] = self.width - dr_env[2]
-        if rjObj.tra_mirror_y:
-            dr_env[1] = self.height - dr_env[1]
-            dr_env[3] = self.height - dr_env[3]
+    def _rjToEnv(self, rjObj:Rj, dr, b_transform=False):
+        if b_transform:
+            dr_env = dr + rjObj.tra_delta
+            if rjObj.tra_mirror_x:
+                dr_env[0] = self.width - dr_env[0]
+                dr_env[2] = self.width - dr_env[2]
+            if rjObj.tra_mirror_y:
+                dr_env[1] = self.height - dr_env[1]
+                dr_env[3] = self.height - dr_env[3]
+        else:
+            dr_env = dr
         return dr_env
             
 

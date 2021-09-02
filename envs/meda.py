@@ -51,7 +51,8 @@ class MEDAEnv(gym.Env):
                  b_degrade=True, b_use_dict=False,
                  b_unify_obs=True, b_parm_step=True, obs_size=(30, 30),
                  deg_mode='normal', deg_perc=0.1, deg_size=1,
-                 b_play_mode=False, delay_counter = 10,
+                 b_play_mode=False, delay_counter = 10, debug=0,
+                 sampling="stratified",
                  **kwargs):
         """ Gym Constructor for MEDA
         :param height: Biochip height in microelectrodes
@@ -64,6 +65,7 @@ class MEDAEnv(gym.Env):
         """
         super(MEDAEnv, self).__init__()
         self.viewer = None
+        self.debug = debug
         self.actions = Direction
         
         # Play mode
@@ -89,6 +91,7 @@ class MEDAEnv(gym.Env):
         self.deg_mode = deg_mode
         self.deg_perc = deg_perc
         self.deg_size = deg_size
+        self.sampling = sampling
         self.xs0range = [3,]
         self.ys0range = [1,3,]
         self.act_count = np.zeros(9)
@@ -161,18 +164,51 @@ class MEDAEnv(gym.Env):
             print("INFO: PYGLET failed to load")
             self.keys_to_action = None
         
+        # Sampling distribution
+        # if self.sampling=="stratified":
+        #     self.x_set = [i for i in range(self.width)]
+        #     self.x_set = [i for i in range(self.width)]
+        # elif self.sampling=="uniform":
+        #     self.x_set = [i for i in range(self.width)]
+        #     self.x_set = [i for i in range(self.width)]
+        # else:
+        #     raise Exception("Unknown sampling option -- aborting!")
+        
+        # Sampling function
+        max_droplet_x, max_droplet_y = max(self.droplet_sizes) # [FIXME]
+        if self.sampling=="stratified":
+            excess_x = self.width // 5
+            excess_y = self.height // 5
+            self.x_set = [0]*(excess_x) + [i for i in range(1,self.width-1)] + [self.width-1]*(excess_x)
+            self.y_set = [0]*(excess_y) + [i for i in range(1,self.width-1)] + [self.width-1]*(excess_y) 
+            self.dr_size_set = copy.deepcopy(self.droplet_sizes)*10
+            self.x_set_buff, self.y_set_buff, self.dr_size_set_buff = [], [], []
+            self.fn_get_sample = self._getStratifiedSample
+        elif self.sampling=="uniform":
+            self.fn_get_sample = self._getUniformSample
+        else:
+            raise Exception("Unknown sampling option -- aborting!")
+            
         # Reset initial state
         self._resetActuationMatrix()
         self._resetInitialState()
         self._resetInitialHealth()
         self._updateHealth()
         
+        if self.debug:
+            self.freq_goal = np.zeros((width, height), dtype=np.int)
+            self.freq_init = np.zeros((width, height), dtype=np.int)
+            self.dr_path = []
+            self.reset_count = 0
         return
 
     
     def get_keys_to_action(self):
         return self.keys_to_action
 
+    def printInfo(self):
+        print("%s\n%s\n%s" % (self.goal,self.droplet,self.hazard))
+        return
 
     # Gym Interfaces
     def reset(self):
@@ -188,7 +224,13 @@ class MEDAEnv(gym.Env):
         self._resetInitialHealth()
         self._updateHealth()
         obs = self._getObs()
-        self.dr_path = [copy.deepcopy(self.droplet),] # For debugging only
+        if self.debug:
+            self.dr_path = [copy.deepcopy(self.droplet),] # For debugging only
+            x0,y0,x1,y1 = self.droplet
+            self.freq_init[x0:x1,y0:y1] += 1
+            x0,y0,x1,y1 = self.goal
+            self.freq_goal[x0:x1,y0:y1] += 1
+            self.reset_count +=1
         return obs
     
     
@@ -202,8 +244,8 @@ class MEDAEnv(gym.Env):
         self.step_count = 0
         # [FIXME] Review what needs to be reset
         
-        self.droplet = copy.deepcopy(dr_s)
-        self.goal = copy.deepcopy(dr_g)
+        self.droplet[:] = dr_s[:]
+        self.goal[:] = dr_g[:]
         if m_taus is not None: self.m_taus = copy.deepcopy(m_taus)
         if m_c1s is not None: self.m_C1s = copy.deepcopy(m_c1s)
         if m_c2s is not None: self.m_C2s = copy.deepcopy(m_c2s)
@@ -217,8 +259,8 @@ class MEDAEnv(gym.Env):
             min(max(self.goal[3],self.droplet[3])+3,self.height)
         )
         # Set the max number of steps allowed
-        # self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
-        self.max_step = 2*(self.width+self.height)
+        self.max_step = 1*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])
+        # self.max_step = 2*(self.width+self.height)
         
         self._updateHealth()
         obs = self._getObs()
@@ -271,7 +313,8 @@ class MEDAEnv(gym.Env):
         prev_dist = self._getDistanceToGoal()
         b_is_valid = self._updatePattern(action)
         if b_is_valid==False: self.violation_count += 1 
-        self.dr_path.append(copy.deepcopy(self.droplet))
+        if self.debug:
+            self.dr_path.append(copy.deepcopy(self.droplet))
         curr_dist = self._getDistanceToGoal()
         self.m_actcount += self.m_pattern
         self._updateHealth()
@@ -573,6 +616,55 @@ class MEDAEnv(gym.Env):
         dist = np.abs(self.goal[0]-self.droplet[0]) + \
             np.abs(self.goal[1]-self.droplet[1])
         return dist
+    
+    def _getStratifiedSample(self):
+        # Fill buffers
+        if len(self.x_set_buff)==0:
+            self.x_set_buff = copy.copy(self.x_set)
+            random.shuffle(self.x_set_buff)
+        if len(self.y_set_buff)==0:
+            self.y_set_buff = copy.copy(self.y_set)
+            random.shuffle(self.y_set_buff)
+        if len(self.dr_size_set_buff)==0:
+            self.dr_size_set_buff = copy.copy(self.dr_size_set)
+            random.shuffle(self.dr_size_set_buff)
+            
+        # Randomly select droplet size first
+        dr_width, dr_height = self.dr_size_set_buff.pop(-1)
+        x0max, y0max = self.width-dr_width, self.height-dr_height
+        xg = self.x_set_buff.pop(-1)
+        xs = self.x_set_buff.pop(-1)
+        yg = self.y_set_buff.pop(-1)
+        ys = self.y_set_buff.pop(-1)
+        
+        # Randomly generate goal state
+        xg0, yg0 = min(max(0,xg-dr_width//2),x0max), min(max(0,yg-dr_height//2),y0max)
+        xg1, yg1 = xg0 + dr_width, yg0 + dr_height
+        self.goal = np.array((xg0,yg0,xg1,yg1))
+        
+        # Randomly generate droplet state
+        xs0, ys0 = min(max(0,xs-dr_width//2),x0max), min(max(0,ys-dr_height//2),y0max)
+        xs1, ys1 = xs0+dr_width, ys0+dr_height # includes mins and excludes maxs
+        self.droplet = np.array((xs0,ys0,xs1,ys1))
+        return
+    
+    def _getUniformSample(self):
+        # Randomly select droplet size first
+        dr_width, dr_height = random.choice(self.droplet_sizes)
+        x0max, y0max = self.width-dr_width, self.height-dr_height
+        
+        # Randomly generate goal state
+        xg0, yg0 = random.randint(0,x0max), random.randint(0,y0max)
+        xg1, yg1 = xg0 + dr_width, yg0 + dr_height
+        self.goal = np.array((xg0,yg0,xg1,yg1))
+        
+        # Randomly generate droplet state
+        while True:
+            xs0, ys0 = random.randint(0, x0max), random.randint(0, y0max)
+            if xs0 != xg0 or ys0 != yg0: break # prevents starting at goal
+        xs1, ys1 = xs0+dr_width, ys0+dr_height # includes mins and excludes maxs
+        self.droplet = np.array((xs0,ys0,xs1,ys1))
+        return
         
         
     def _resetInitialState(self):
@@ -581,49 +673,39 @@ class MEDAEnv(gym.Env):
         """
         # [DONE] Implement random dr_0 and dr_g generator based on size
         
-        # Randomly select droplet size first
-        dr_width, dr_height = random.choice(self.droplet_sizes)
+        self.fn_get_sample()
         
-        # Randomly generate goal state
-        # [NOTE][2021-07-25] This was replaced by the full range
+        # Compute hazard bounds
+        self.hazard[:] = (
+            max(min(self.goal[0],self.droplet[0])-3, 0),
+            max(min(self.goal[1],self.droplet[1])-3, 0),
+            min(max(self.goal[2],self.droplet[2])+3, self.width),
+            min(max(self.goal[3],self.droplet[3])+3, self.height)
+        )
+        
+        # xmin,ymin,xmax,ymax = min(xg0,xs0),min(yg0,ys0),max(xg1,xs1),max(yg1,ys1)
+        # self.hazard = np.clip([xmin,ymin,xmax,ymax],)
+        # self.hazard[:] = (
+        #     max(min(self.goal[0],self.droplet[0])-3,0),
+        #     max(min(self.goal[1],self.droplet[1])-3,0),
+        #     min(max(self.goal[2],self.droplet[2])+3,self.width),
+        #     min(max(self.goal[3],self.droplet[3])+3,self.height)
+        # )
+        # xs0 = random.randint(self.width-dr_width-2, self.width-dr_width)
+        # ys0 = random.randint(self.height-dr_height-2, self.height-dr_height)
+        # xg0, yg0 = 0, 0
         # xg0 = random.randint(1,self.width-dr_width)
         # yg0 = random.randint(1,np.min((xg0,self.height-dr_height)))
-        # xg0 = random.randint(0,4) #self.width-dr_width)
-        # yg0 = random.randint(0,4) #self.height-dr_height)
-        xg0 = 0
-        yg0 = 0
-        xg1 = xg0 + dr_width
-        yg1 = yg0 + dr_height
-        # self.goal[:] = (xg0,yg0,xg1,yg1)
-        self.goal = np.array((xg0,yg0,xg1,yg1))
-        
-        # Randomly generate droplet state
         # [NOTE][2021-07-25] This was replaced by full range
         # xs0 = random.choice(self.xs0range)
         # ys0 = random.choice(self.ys0range)
-        
         # b_tmp_at_goal = True
         # while b_tmp_at_goal: # prevents starting at goal
         #     xs0 = random.randint(0,self.width-dr_width)
         #     ys0 = random.randint(0,self.height-dr_height)
         #     b_tmp_at_goal = (xs0==xg0) and (ys0==yg0)
-        xs0 = random.randint(self.width-dr_width-2, self.width-dr_width)
-        ys0 = random.randint(self.height-dr_height-2, self.height-dr_height)
-        
-        # Droplet range includes mins and excludes maxs
-        xs1 = xs0 + dr_width
-        ys1 = ys0 + dr_height
-        self.droplet = np.array((xs0,ys0,xs1,ys1))
         
         
-        
-        # Compute hazard bounds
-        self.hazard[:] = (
-            max(min(self.goal[0],self.droplet[0])-3,0),
-            max(min(self.goal[1],self.droplet[1])-3,0),
-            min(max(self.goal[2],self.droplet[2])+3,self.width),
-            min(max(self.goal[3],self.droplet[3])+3,self.height)
-        )
         
         # Set the max number of steps allowed
         # self.max_step = 2*(self.hazard[2]-self.hazard[0]+self.hazard[3]-self.hazard[1])

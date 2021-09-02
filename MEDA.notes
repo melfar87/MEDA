@@ -1,0 +1,146 @@
+PPO2:
+
+[ppo2]:
+
+Files:
+    - base_vec_env.py
+    
+
+Keypoints:
+    - A learning step happens once per update
+
+Keywords:
+    - Rollout: a run from a given state with uncertainty (influenced by actions)
+
+Contexts:
+    "train_model"
+    "loss"
+    "input_info"
+
+Objects:
+    stable_baselines.ppo2.ppo2.PPO2
+    stable_baselines.ppo2.ppo2.Runner
+
+Variables:
+    #n_batch# total number of samples per batch = 256
+    #nminibatches# the number of minibatches
+    #batch_size# ":= n_batch // nminibatches" number of samples per minibatch
+    #gamma#
+
+    #nextnonterminal# 
+    #nextvalues#
+    #delta#
+
+    #noptepochs# [param] No. of epochs when optimizing the surrogate
+
+
+#__init__:
+    #super().__init__()[base_class.ActorCriticRLModel]:
+        initializes properties
+    #setup_model():
+        create tensorflow graph #graph#
+        make tf session [sess]
+
+        create actor model #act_model# by calling #MyCnnPolicy.__init__#
+            n_envs=n_env, reuse=False
+
+        with "train_model" scope and reuse:
+            create train model #train_model# by calling #MyCnnPolicy.__init__#
+                [python]
+                n_envs = n_envs // nminibatches # which is 0!
+                [end]
+
+        with "loss" scorpe and no reuse:
+            create tf placeholders for all ph vars
+            create loss formulas (too long of a code)
+        
+        create #self._train# as an #tf.train.AdamOptimizer#
+
+        with "input_info" and no reuse:
+            !TBD
+        
+        save all #self# variables
+        run #tf.global_variables_initializer().run(session=self.sess)#
+
+
+#learn()#:
+    set learning rate, cliprange, cliprange_vf schedules
+    reset total number of timesteps
+    #callback# if any
+
+    #self._setup_learn():
+        reset #episode_reward#
+
+    // No. updates = total steps / no. steps per batch
+    "n_updates = total_timesteps // self.n_batch = 16k//256 = 64"
+
+    #callback.on_training_start()#
+
+    // Main loop for updates
+    for update in range #self.n_updates#:                   ![1,64]
+        compute #batch_size#
+        compute #frac#
+        compute #lr_now#, #cliprange_now#=0.2, #cliprange_vf_now#=0.2
+
+        #callback.on_rollout_start()#
+        #rollout = self.runner.run(callback)#, which returns:
+        obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward
+        ultimately calls #self._run()#
+            
+        ![A] Run a learning step of the model, which is n_steps * n_envs
+        #self._run()#: !stable_baselines.ppo2.ppo2.Runner
+            // mb: minibatch 
+            for _ in range #self.n_steps#:                      ![0:31]
+                !// Predict: obtain best actions from current model
+                get actions, values, neglogpacs from #self.model.step#
+                append values to #mb# lists
+                !// Step: execute actions on the vectorized environment
+                "self.obs[:], rewards, self.dones, infos = self.env.step(clipped_actions)"
+                    // step() lives in base_vec_env, step_wait in dummy_vec_env
+                    // eventually calls env.step()
+                    !// step_wait() resets if done
+                increment #self.model.num_timesteps# by #self.n_envs#
+                save episode info
+                save mb rewards 
+            !Note: mb_<var> are 32x8 arrays
+            save mb_obs/rewards/actions/neglogpacs/dones // one rollout
+            save "last_values" from #self.model.value(self.obs, self.states, self.dones)#
+    
+            !// Compute: discount bootstrap off value fn
+            for step in reversed #self.n_steps#:                 ![31:0]
+                Compute nextnonterminal/nextvalues/delta/mb_advs[step]
+                    from mb_dones/mb_values/mb_rewards
+
+            mb_returns = mb_advs + mb_values
+            swap and flatten mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward
+            return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward as #rollout#
+
+        unpack obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = #rollout#
+        "callback.on_rollout_end()"
+        stop if requested by callback
+
+        ![B]  
+        
+            
+
+
+
+
+
+
+
+
+step_wait (\home\elfar\anaconda3\envs\meda\lib\python3.6\site-packages\stable_baselines\common\vec_env\dummy_vec_env.py:42)
+step (\home\elfar\anaconda3\envs\meda\lib\python3.6\site-packages\stable_baselines\common\vec_env\base_vec_env.py:150)
+_run (\home\elfar\anaconda3\envs\meda\lib\python3.6\site-packages\stable_baselines\ppo2\ppo2.py:482)
+run (\home\elfar\anaconda3\envs\meda\lib\python3.6\site-packages\stable_baselines\common\runners.py:48)
+learn (\home\elfar\anaconda3\envs\meda\lib\python3.6\site-packages\stable_baselines\ppo2\ppo2.py:336)
+runAnExperiment (\home\elfar\MEDA\train.py:185)
+expSeveralRuns (\home\elfar\MEDA\train.py:371)
+main (\home\elfar\MEDA\train.py:16)
+<module> (\home\elfar\MEDA\train.py:498)
+_run_code (\home\elfar\anaconda3\envs\meda\lib\python3.6\runpy.py:85)
+_run_module_code (\home\elfar\anaconda3\envs\meda\lib\python3.6\runpy.py:96)
+run_path (\home\elfar\anaconda3\envs\meda\lib\python3.6\runpy.py:263)
+_run_code (\home\elfar\anaconda3\envs\meda\lib\python3.6\runpy.py:85)
+_run_module_as_main (\home\elfar\anaconda3\envs\meda\lib\python3.6\runpy.py:193)
