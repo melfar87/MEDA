@@ -14,8 +14,9 @@ plt.draw()
 plt.savefig('a_log/_Plot.png')
 
 LIST:
-    0826a_030x030_E100_NPS64_00
-    
+    0826a_030x030_E100_NPS64_00 use for 30x30
+    ./data/0917a_060x030_E100__00 use for 60x30
+        For future, stop at 12.9 cycles
 
 MEDA.TODOLIST:
     ✔ Understand the learning process @done(21-08-23 15:49)

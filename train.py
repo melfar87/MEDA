@@ -435,21 +435,21 @@ if __name__ == '__main__':
         'debug':             1,
         'verbose':           '30', # (TF|Monitor) 3: suppress warnings
         's_mode':            'train', # train | test
-        's_model_name':      '0826a',
-        'size':              (30,30),
+        's_model_name':      '0917a',
+        'size':              (60,30),
         'obs_size':          (30,30),
-        's_description':     's30/o30 nmini, d0.5, 64, EvalEnv, Deb, Stratified',
-        'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
+        's_description':     's63/o30 nmini, d.5, 64, EvEnv, Deb, Stratified, Dr, E13',
+        'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],], # [2,2],[3,3],[3,4],[4,3],
         'n_envs':            8,
         'n_policysteps':     64, # [NOTE][2021-07-25] Was 32
         'n_exps':            1,
         'n_epochs':          100,
-        'n_total_timesteps': 2**14,
+        'n_total_timesteps': 2**13,
         'f_lr':              3.5e-4, # learning rate base
         'n_minibatches':     16, # no. minibatches per update
         'b_save_model':      True,
-        's_suffix':          'NPS64', #'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
-        's_load_model':      '',#'0727a_030x030_E010_NPS32_00', #'0726b_030x030_E050_NPS16_00', #'TMP_E_030x030_E040__00',#'TMP_D_030x030_E025_T30V300TL_D22_00', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
+        's_suffix':          '', #'T30V300TL_D22',#'T30V300TL_D12', #'T30V300TL_D23', #'T30V300TL_D12', # T30V300TL_D22
+        's_load_model':      '0826a_030x030_E100_NPS64_00', #'0826a_030x030_E100_NPS64_00',#'0727a_030x030_E010_NPS32_00', #'0726b_030x030_E050_NPS16_00', #'TMP_E_030x030_E040__00',#'TMP_D_030x030_E025_T30V300TL_D22_00', #'MDL_C_090x090_E025_T30V300TL_D12_00',#'MDL_C_090x090_E025_T30V300TL60_00',#'MDL_C_060x060_E025_T30V300_00',#'MDL_C_060x060_E025_T30V300TL_D22_00', # 'MDL_C_060x060_E025_T30V300_00', # 'MDL_C_030x030_E025_T30V300TL_D12_00', # MDL_C_030x030_E031_S30V300_00 MDL_A_030x030_E101_NS30_00 TMP_B_030x030_E005_S30V300_00
         'b_play_mode':       False,
         'deg_mode':          'normal',
         'deg_perc':          0.2,

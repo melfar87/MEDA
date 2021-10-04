@@ -1,4 +1,5 @@
 from cv2 import DrawMatchesFlags_DRAW_OVER_OUTIMG
+from matplotlib.pyplot import tick_params
 from envs.meda import MEDAEnv
 import numpy as np
 from typing import List
@@ -84,6 +85,8 @@ class Rj():
         self.obs = None
         self.state:State = State.INIT
         self.b_is_done = False
+        self.k = -1
+        self.time = -1
         # self.shift = None
         self.tra_mirror_x = None
         self.tra_mirror_y = None
@@ -113,6 +116,8 @@ class MedaScheduler():
         # super(MedaScheduler, self).__init__()
         self.biochip:MedaBiochip = biochip
         self.env_list = env.envs
+        self.m_pattern:np.ndarray = np.zeros_like(env.envs[0].m_pattern)
+        self.m_actcount:np.ndarray = np.zeros_like(env.envs[0].m_actcount)
         self.env_rj_ids:List = [None] * env.num_envs
         self.policy = policy
         self.width = width
@@ -127,6 +132,30 @@ class MedaScheduler():
         self.dr_list:list[Droplet] = []
         self.mo_dict = {}
         self.dis_list:list[Rj] = [] # list of busy dispensing jobs
+        self.ticks = 0
+        return
+    
+    
+    def reset(self):
+        self.obs = self.env.reset()
+        self.m_actcount = np.random.randint(0,high=400,size=self.m_actcount.shape)
+        self.m_pattern.fill(0)
+        # self.m_actcount.fill(0)
+        moObj:Mo
+        for moObj in self.mo_list:
+            moObj.state = State.READY
+            moObj.k = -1
+            moObj.time = -1   
+        rjObj:Rj
+        for rjObj in self.rj_list:
+            rjObj.state = State.INIT
+            rjObj.k = -1
+            rjObj.time = -1
+            rjObj.b_is_done = False
+            rjObj.b_show = False
+        self.dis_list = []
+        self.ticks = 0
+        self.state = State.INIT
         return
     
     
@@ -156,11 +185,12 @@ class MedaScheduler():
         """ Run one control loop """
         self.droplets = self.biochip.getDroplets()
         self.processStates()
-        self.env.envs[0].render(mode='human_frame') # Render
+        # self.env.envs[0].render(mode='human_frame') # Render
         self.updateControlActions()
-        self.env.envs[0].render(mode='human_frame') # Render
+        # self.env.envs[0].render(mode='human_frame') # Render
         # self.applyControlActions()
         self.biochip.setDroplets(self.droplets)
+        self.ticks += 1
         return self.state
     
     
@@ -194,6 +224,7 @@ class MedaScheduler():
                         b_can_start = b_can_start and condObj.state == State.DONE
                     if b_can_start:
                         moObj.k = 0
+                        moObj.time = self.ticks
                         rjObj:Rj # typing
                         for rjObj in moObj.rj_list:
                             # [TODO] Strategy should be synthesized here
@@ -201,6 +232,8 @@ class MedaScheduler():
                             # self.JobStates[moId][jobId] = [2,jobObj.droplet]
                             self._assignEnv(rjObj)
                             rjObj.b_show = True
+                            rjObj.time = self.ticks
+                            rjObj.k = 0
                         for preObjName in moObj.s_pre:
                             preObj:Mo = self.mo_dict[preObjName]
                             preRjObj:Rj # typing
@@ -217,9 +250,11 @@ class MedaScheduler():
                         moObj.state = State.DONE
                         if moObj.s_type in {'Out','Dsc'}:
                             moObj.rj_list[0].b_show = False
-                        for rjObj in moObj.rj_list:
-                            self._releaseEnv(rjObj)
+                        # [NOTE] Release moved to fix multi-rj MOs
+                        # for rjObj in moObj.rj_list:
+                        #    self._releaseEnv(rjObj)
                         b_repeat = True
+                    moObj.k += 1
                 # DONE State
                 elif moObj.state == State.DONE:
                     pass # do nothing
@@ -244,6 +279,8 @@ class MedaScheduler():
     
     def updateControlActions(self):
         """ Updates control actions for all RJs """
+        # control pattern
+        self.m_pattern.fill(0)
         # [NOTE][2021-07-25] Added deterministic=True parameter
         action, state = self.policy.predict(self.obs, deterministic=True)
         self.obs, reward, done, _info = self.env.step(action)
@@ -251,10 +288,15 @@ class MedaScheduler():
         for env_id, rj_id in enumerate(self.env_rj_ids):
             if rj_id is not None:
                 self.rj_list[rj_id].b_is_done = done[env_id]
+                self.rj_list[rj_id].k += 1
+                if self.rj_list[rj_id].b_is_done:
+                    self._releaseEnv(self.rj_list[rj_id])
+                self.m_pattern += self.env.envs[env_id].prev_m_pattern
+                
         
-        print(done)
-        print(reward)
-        print(action)
+        # print(done)
+        # print(reward)
+        # print(action)
         
         # Process dispensing operations separately
         rjObj:Rj
@@ -280,6 +322,9 @@ class MedaScheduler():
             else:
                 rjObj.b_is_done = True
         
+        
+        np.clip(self.m_pattern,0,1,out=self.m_pattern)
+        self.m_actcount += self.m_pattern
         # [FIXME] Remove dispensing jobs that are finished from self.dis_list
         
         # moObj:Mo # typing
@@ -364,7 +409,8 @@ class MedaScheduler():
         
         rjObj.obs = rj_env.setState(
             dr_s=rjObj.env_droplet,
-            dr_g=rjObj.env_goal
+            dr_g=rjObj.env_goal,
+            m_actcount=self.m_actcount
         )
         
         self.obs[rjObj.env_id] = rjObj.obs

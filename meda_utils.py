@@ -2,7 +2,7 @@ from enum import IntEnum
 import numpy as np
 from stable_baselines.common.schedules import Schedule
 import math
-
+import matplotlib.pyplot as plt
 
 class State(IntEnum):
     UNDEFINED = 0
@@ -88,6 +88,43 @@ class LearningRateSchedule(Schedule):
         return lr_now
 
 
-# def learningRate(frac:float):
-    
-#     return
+def plotProbVsCycles(k_list, str_filename, str_title='Title'):
+    data = np.array(k_list)
+    # o_line = np.average(o_rewards, axis = 0)
+    a_max = np.max(data, axis = 0) + 1
+    a_min = np.min(data, axis = 0) - 1
+    # o_max = np.max(o_rewards, axis = 0)
+    # o_min = np.min(o_rewards, axis = 0)
+    x_data = np.array([i for i in range(a_min,a_max+1)])
+    sample_count = data.size
+    y_data = np.zeros(x_data.shape)
+    for i in range(x_data.size):
+        y_data[i] = np.sum(data <= x_data[i])/sample_count
+
+    with plt.style.context('seaborn-paper'):
+        plt.rcParams.update({'font.size': 10, 'figure.figsize': (6,4)})
+        plt.figure()
+        # plt.fill_between(episodes, a_max, a_min, facecolor = 'red', alpha = 0.3)
+        # plt.fill_between(episodes, o_max, o_min, facecolor = 'blue',
+        #         alpha = 0.3)
+        plt.plot(x_data, y_data, 'r-', label = 'DRL')
+        # plt.plot(episodes, a_goals_line, 'g.', label = 'Success Rate')
+        # plt.plot(episodes, a_cycles_line, 'k-.', label = 'No. Cycles')
+        # plt.plot(episodes, o_line, 'b-', label = 'Baseline')
+        # if b_path:
+            # leg = plt.legend(loc = 'upper left', shadow = True, fancybox = True)
+        # else:
+        # leg = plt.legend(loc = 'lower right', shadow = True, fancybox = True)
+        # leg.get_frame().set_alpha(0.5)
+        plt.title(str_title)
+        plt.xlabel('Number of Cycles')
+        plt.ylabel('Prob. of Success')
+        plt.tight_layout()
+        # Save PNG
+        plt.savefig('figs/' + str_filename + '.png')
+        # Save TEX
+        import tikzplotlib
+        tikzplotlib.clean_figure()
+        tikzplotlib.save('figs/' + str_filename + '.tex')
+        
+    return

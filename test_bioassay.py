@@ -13,7 +13,7 @@ from matplotlib.pyplot import pause
 import matplotlib.animation as animation
 
 from meda_sgs import Bioassays
-from meda_utils import showIsGPU, State
+from meda_utils import showIsGPU, State, plotProbVsCycles
 
 # from utils import *
 
@@ -40,10 +40,10 @@ def main(args):
     policy.set_env(env)
     
     t_total_s = time.time()
-    testBioassay(args, env=env, policy=policy)
+    k_list = testBioassay(args, env=env, policy=policy)
     t_total_e = time.time()
     t_total = t_total_e - t_total_s
-    print("| Finished training in %26s %4d min %2d sec |" 
+    print("| Finished testing in %26s %4d min %2d sec |" 
           % (" ",t_total//60, t_total%60))
     print("+=================================================================+")
     # print(getTimeStamp())
@@ -59,20 +59,34 @@ def testBioassay(args, env=None, policy=None):
     
     # Create bioassay, sequence graph, biochip and schedule
     bioassay = Bioassays()
-    sequence_graph = bioassay.sg_Simple
+    
+    sequence_graph = bioassay.sg_CPCR #bioassay.sg_Simple
+    plotfilename = 'k_CPCR'
+    str_title = 'CPCR'
+    k_max = 2000
+    trial_max = 1000
+    
     biochip = MedaBiochip(env=env, policy=policy, width=width, height=height)
     scheduler = MedaScheduler(biochip=biochip, env=env, policy=policy,
                               width=width, height=height)
     bioassay.importBioassay(sequence_graph, scheduler)
     scheduler.preprocessAllMos()
-    print("We are doomed...")
+    # print("We are doomed...")
     
-    for k in range(100):
-        sch_state:State = scheduler.tick()
-        if sch_state == State.Done:
-            break
-    
-    return
+    k_list = []
+    for trial in range(trial_max):
+        scheduler.reset()
+        for k in range(k_max):
+            # print("k: %3d" % k)
+            sch_state:State = scheduler.tick()
+            if sch_state == State.DONE:
+                break
+        k_list.append(k+1)
+        print("Trial %3d: k= %3d" % (trial,k+1))
+        
+    print("Mean k = %f" % np.mean(k_list))
+    plotProbVsCycles(k_list,plotfilename,str_title=str_title)
+    return k_list
 
 if __name__ == '__main__':
     b_disable_warnings = False
@@ -82,18 +96,18 @@ if __name__ == '__main__':
         'seed':              -1,
         'verbose':           '3',
         's_mode':            'test', # train | test
-        'size':              (30,30),
+        'size':              (60,30),
         'obs_size':          (30,30),
         'droplet_sizes':     [[4,4],[5,4],[5,5],[6,5],[6,6],],
         'n_envs':            8,
         'n_policysteps':     64,
         'n_exps':            1,
-        'n_epochs':          40,
+        'n_epochs':          100,
         'n_total_timesteps': 2**14,
         'b_save_model':      True,
         's_model_name':      'TMP_E',
         's_suffix':          '',
-        's_load_model':      '0826a_030x030_E100_NPS64_00', #'0725_030x030_E100__00', 
+        's_load_model':      '0917a_060x030_E100__00', #'0826a_030x030_E100_NPS64_00', #'0725_030x030_E100__00', 
         'b_play_mode':       False,
         'deg_mode':          'normal',
         'deg_perc':          0.2,

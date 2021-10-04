@@ -101,13 +101,14 @@ class MEDAEnv(gym.Env):
         self.droplet = np.zeros(4, dtype=np.int)
         self.goal = np.zeros(4, dtype=np.int)
         self.hazard = np.zeros(4, dtype=np.int)
-        self.m_taus = np.ones((width, height)) * 0.8
+        self.m_taus = np.ones((width, height)) * 0.7
         self.m_C1s = np.ones((width, height)) * 0
         self.m_C2s = np.ones((width, height)) * 200
         self.m_degradation = np.ones((width, height))
         self.m_health = np.ones((width, height))
         self.m_actcount = np.zeros((width, height))
         self.m_pattern = np.zeros((width, height), dtype=np.uint8)
+        self.prev_m_pattern = np.zeros((width, height), dtype=np.uint8)
         self.step_count = 0
         self.max_step = 0
         self.violation_count = 0
@@ -722,7 +723,7 @@ class MEDAEnv(gym.Env):
     def _resetInitialHealth(self):
         """Resets initial health parameters
         """
-        self.m_taus.fill(0.8)
+        self.m_taus.fill(0.7)
         self.m_C1s.fill(0)
         self.m_C2s.fill(200)
         if self.deg_mode=='normal':
@@ -873,6 +874,7 @@ class MEDAEnv(gym.Env):
             if moveE: dr += [+1, 0,+1, 0]
             if moveW: dr += [-1, 0,-1, 0]
         
+        self.prev_m_pattern[:] = self.m_pattern[:]
         return b_is_valid
         
         
