@@ -9,17 +9,17 @@ from stable_baselines.common.policies import ActorCriticPolicy
 def myCnn(scaled_images, **kwargs):
     activ = tf.nn.relu
     layer1 = activ(conv(scaled_images, 'c1',
-            n_filters = 64, filter_size = 3,
+            n_filters = 32, filter_size = 3,
             stride = 1, pad = 'SAME', **kwargs))
     layer2 = activ(conv(layer1, 'c2',
-            n_filters = 128, filter_size = 3,
+            n_filters = 64, filter_size = 3,
             stride = 1, pad = 'SAME', **kwargs))
     layer3 = activ(conv(layer2, 'c3',
-            n_filters = 128, filter_size = 3,
+            n_filters = 64, filter_size = 3,
             stride = 1, pad = 'SAME', **kwargs))
     layer3 = conv_to_fc(layer3)
     return activ(linear(layer3, 'fc1',
-            n_hidden = 256, init_scale = np.sqrt(2)))
+            n_hidden = 128, init_scale = np.sqrt(2)))
 
 class MyCnnPolicy(ActorCriticPolicy):
     def __init__(self, sess, ob_space, ac_space,
